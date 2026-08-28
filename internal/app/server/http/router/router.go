@@ -20,6 +20,8 @@ func New(
 	homeHandler *handler.HomeHandler,
 	bannerHandler *handler.AdminBannerHandler,
 	pointsHandler *handler.PointsHandler,
+	refundHandler *handler.RefundHandler,
+	dashboardHandler *handler.DashboardHandler,
 ) *gin.Engine {
 	r := gin.Default()
 	v1 := r.Group("/api/v1")
@@ -31,10 +33,14 @@ func New(
 		v1.GET("/home", homeHandler.Get)
 		v1.POST("/orders", authMw.User(), orderHandler.Create)
 		v1.GET("/orders/:order_no", authMw.User(), orderHandler.Get)
+		v1.POST("/orders/:order_no/refund", authMw.User(), refundHandler.Apply)
 		v1.POST("/payments", authMw.User(), paymentHandler.Create)
 		v1.POST("/payments/mock-pay", authMw.User(), paymentHandler.MockPay)
 		v1.GET("/payments/order/:order_no", authMw.User(), paymentHandler.GetByOrder)
 		v1.GET("/me/points", authMw.User(), pointsHandler.Get)
+		v1.POST("/me/points/exchange", authMw.User(), pointsHandler.Exchange)
+		v1.GET("/coupons/redeemable", pointsHandler.ListRedeemable)
+		v1.POST("/refunds/mock-callback", refundHandler.MockCallback)
 		// 模拟网关回调：不挂用户鉴权（真实场景由网关签名校验）
 		v1.POST("/payments/mock-callback", paymentHandler.MockCallback)
 
@@ -57,6 +63,12 @@ func New(
 			admin.GET("/banners", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), bannerHandler.List)
 			admin.PATCH("/banners/:id", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), bannerHandler.Update)
 			admin.DELETE("/banners/:id", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), bannerHandler.Delete)
+
+			dashboard := admin.Group("/dashboard", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin, domain.RoleFinance))
+			dashboard.GET("/box-office", dashboardHandler.Trend)
+			dashboard.GET("/box-office/by-movie", dashboardHandler.ByMovie)
+			dashboard.GET("/box-office/by-cinema", dashboardHandler.ByCinema)
+			dashboard.POST("/box-office/reconcile", authMw.Admin(domain.RoleSuperAdmin), dashboardHandler.Reconcile)
 		}
 	}
 	return r

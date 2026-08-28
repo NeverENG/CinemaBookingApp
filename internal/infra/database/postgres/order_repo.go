@@ -104,6 +104,20 @@ func (r *OrderRepo) Transition(ctx context.Context, orderNo string, from, to dom
 	return nil
 }
 
+func (r *OrderRepo) ListExpiredPending(ctx context.Context, now time.Time) ([]domain.Order, error) {
+	var rows []orderRow
+	if err := r.db.db(ctx).
+		Where("status = ? AND expire_at < ?", domain.OrderPendingPayment, now).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	orders := make([]domain.Order, 0, len(rows))
+	for _, row := range rows {
+		orders = append(orders, *toDomainOrder(row, nil))
+	}
+	return orders, nil
+}
+
 // IssueTickets 给订单明细写取票码（只补 ticket_no 为空的行）。
 func (r *OrderRepo) IssueTickets(ctx context.Context, orderNo string, tickets []domain.OrderItem) error {
 	for _, t := range tickets {
@@ -151,7 +165,11 @@ func (r *OrderRepo) ListPaidBySessionID(ctx context.Context, sessionID int64) ([
 	}
 	orders := make([]domain.Order, 0, len(rows))
 	for _, row := range rows {
-		orders = append(orders, *toDomainOrder(row, nil))
+		var itemRows []orderItemRow
+		if err := r.db.db(ctx).Where("order_no = ?", row.OrderNo).Order("id").Find(&itemRows).Error; err != nil {
+			return nil, err
+		}
+		orders = append(orders, *toDomainOrder(row, itemRows))
 	}
 	return orders, nil
 }

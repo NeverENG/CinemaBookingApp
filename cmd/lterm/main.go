@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
+	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/app/wire"
 	"github.com/NeverENG/CinemaBookingApp/internal/infra/database/postgres"
@@ -27,6 +29,9 @@ func main() {
 	}
 
 	log.Printf("listening on %s", app.Addr)
+	jobCtx, cancelJobs := context.WithCancel(context.Background())
+	defer cancelJobs()
+	go app.Jobs.RunPeriodically(jobCtx, time.Minute)
 	if err := app.Engine.Run(app.Addr); err != nil {
 		log.Fatalf("server: %v", err)
 	}

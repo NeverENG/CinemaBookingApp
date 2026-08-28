@@ -30,6 +30,9 @@ type couponTemplateRow struct {
 	PercentBp        int    `gorm:"column:percent_bp"`
 	MinSpendCents    int64  `gorm:"column:min_spend_cents"`
 	MaxDiscountCents int64  `gorm:"column:max_discount_cents"`
+	Redeemable       bool   `gorm:"column:redeemable"`
+	RedeemPoints     int    `gorm:"column:redeem_points"`
+	ValidDays        int    `gorm:"column:valid_days"`
 	TotalQty         int    `gorm:"column:total_qty"`
 	PerUserLimit     int    `gorm:"column:per_user_limit"`
 	Status           string `gorm:"column:status"`
@@ -85,10 +88,53 @@ func (r *UserCouponRepo) GetTemplateByID(ctx context.Context, templateID int64) 
 		PercentBp:        row.PercentBp,
 		MinSpendCents:    row.MinSpendCents,
 		MaxDiscountCents: row.MaxDiscountCents,
+		Redeemable:       row.Redeemable,
+		RedeemPoints:     row.RedeemPoints,
+		ValidDays:        row.ValidDays,
 		TotalQty:         row.TotalQty,
 		PerUserLimit:     row.PerUserLimit,
 		Status:           row.Status,
 	}, nil
+}
+
+func (r *UserCouponRepo) ListRedeemableTemplates(ctx context.Context) ([]domain.CouponTemplate, error) {
+	var rows []couponTemplateRow
+	if err := r.db.db(ctx).
+		Where("redeemable = ? AND status = ?", true, "ACTIVE").
+		Order("redeem_points, id").
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	templates := make([]domain.CouponTemplate, 0, len(rows))
+	for _, row := range rows {
+		templates = append(templates, domain.CouponTemplate{
+			ID:               row.ID,
+			Name:             row.Name,
+			Type:             row.Type,
+			ValueCents:       row.ValueCents,
+			PercentBp:        row.PercentBp,
+			MinSpendCents:    row.MinSpendCents,
+			MaxDiscountCents: row.MaxDiscountCents,
+			Redeemable:       row.Redeemable,
+			RedeemPoints:     row.RedeemPoints,
+			ValidDays:        row.ValidDays,
+			TotalQty:         row.TotalQty,
+			PerUserLimit:     row.PerUserLimit,
+			Status:           row.Status,
+		})
+	}
+	return templates, nil
+}
+
+func (r *UserCouponRepo) CreateInstance(ctx context.Context, coupon *domain.UserCoupon) error {
+	return r.db.db(ctx).Create(&userCouponRow{
+		CouponNo:   coupon.CouponNo,
+		TemplateID: coupon.TemplateID,
+		UserID:     coupon.UserID,
+		Status:     coupon.Status,
+		OrderNo:    coupon.OrderNo,
+		ExpireAt:   coupon.ExpireAt,
+	}).Error
 }
 
 // LockForOrder 条件 UPDATE：只有 UNUSED 的券能锁到，并发下仅一单成功。

@@ -42,7 +42,9 @@ func Error(c *gin.Context, err error) {
 		errors.Is(err, domain.ErrOrderExpired),
 		errors.Is(err, domain.ErrPaymentAmountMismatch),
 		errors.Is(err, domain.ErrSessionTimeConflict),
-		errors.Is(err, domain.ErrSessionLockedForChange):
+		errors.Is(err, domain.ErrSessionLockedForChange),
+		errors.Is(err, domain.ErrOrderNotRefundable),
+		errors.Is(err, domain.ErrRefundExists):
 		Fail(c, http.StatusConflict, err.Error())
 	case errors.Is(err, domain.ErrMovieInvalid),
 		errors.Is(err, domain.ErrHallInvalid),
@@ -51,6 +53,8 @@ func Error(c *gin.Context, err error) {
 		Fail(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, domain.ErrInvalidCredentials):
 		Fail(c, http.StatusUnauthorized, err.Error())
+	case errors.Is(err, domain.ErrRefundNotFound):
+		Fail(c, http.StatusNotFound, err.Error())
 	case errors.Is(err, domain.ErrForbidden):
 		Fail(c, http.StatusForbidden, err.Error())
 	default:

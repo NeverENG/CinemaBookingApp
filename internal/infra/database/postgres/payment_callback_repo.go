@@ -17,6 +17,7 @@ type paymentCallbackRow struct {
 	AmountCents   int64                 `gorm:"column:amount_cents"`
 	Payload       string                `gorm:"column:payload"`
 	Status        domain.CallbackStatus `gorm:"column:status"`
+	RetryCount    int                   `gorm:"column:retry_count"`
 	ProcessResult string                `gorm:"column:process_result"`
 	CreatedAt     time.Time             `gorm:"column:created_at"`
 	ProcessedAt   *time.Time            `gorm:"column:processed_at"`
@@ -73,4 +74,59 @@ func (r *PaymentCallbackRepo) MarkFailed(ctx context.Context, eventID, reason st
 			"status":         domain.CallbackFailed,
 			"process_result": reason,
 		}).Error
+}
+
+func (r *PaymentCallbackRepo) GetByEventID(ctx context.Context, eventID string) (*domain.PaymentCallback, error) {
+	var row paymentCallbackRow
+	err := r.db.db(ctx).Where("event_id = ?", eventID).First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, domain.ErrPaymentNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &domain.PaymentCallback{
+		EventID:       row.EventID,
+		TransactionNo: row.TransactionNo,
+		AmountCents:   row.AmountCents,
+		Payload:       row.Payload,
+		Status:        row.Status,
+		RetryCount:    row.RetryCount,
+		CreatedAt:     row.CreatedAt,
+		ProcessedAt:   row.ProcessedAt,
+	}, nil
+}
+
+const maxCallbackRetries = 5
+
+func (r *PaymentCallbackRepo) ListPending(ctx context.Context, limit int) ([]domain.PaymentCallback, error) {
+	var rows []paymentCallbackRow
+	if err := r.db.db(ctx).
+		Where("status IN ? AND retry_count < ?", []domain.CallbackStatus{domain.CallbackReceived, domain.CallbackFailed}, maxCallbackRetries).
+		Order("id").
+		Limit(limit).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	callbacks := make([]domain.PaymentCallback, 0, len(rows))
+	for _, row := range rows {
+		callbacks = append(callbacks, domain.PaymentCallback{
+			EventID:       row.EventID,
+			TransactionNo: row.TransactionNo,
+			AmountCents:   row.AmountCents,
+			Payload:       row.Payload,
+			Status:        row.Status,
+			RetryCount:    row.RetryCount,
+			CreatedAt:     row.CreatedAt,
+			ProcessedAt:   row.ProcessedAt,
+		})
+	}
+	return callbacks, nil
+}
+
+func (r *PaymentCallbackRepo) IncrementRetry(ctx context.Context, eventID string) error {
+	return r.db.db(ctx).
+		Model(&paymentCallbackRow{}).
+		Where("event_id = ?", eventID).
+		Update("retry_count", gorm.Expr("retry_count + 1")).Error
 }

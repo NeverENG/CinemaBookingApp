@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/NeverENG/CinemaBookingApp/internal/app/job"
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/handler"
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/middleware"
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/router"
@@ -23,6 +24,7 @@ type App struct {
 	Engine *gin.Engine
 	DB     *gorm.DB
 	Addr   string
+	Jobs   *job.Runner
 }
 
 // NewApp 按依赖方向手工组装：config → db → repos → services → handlers → router。
@@ -61,6 +63,7 @@ func NewApp() (*App, error) {
 	refundRepo := postgres.NewRefundRepo(pg)
 	bannerRepo := postgres.NewBannerRepo(pg)
 	pointsRepo := postgres.NewPointsRepo(pg)
+	boxOfficeRepo := postgres.NewBoxOfficeRepo(pg)
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -69,7 +72,7 @@ func NewApp() (*App, error) {
 	tokens := jwt.New(jwtSecret, 24*time.Hour)
 
 	orderSvc := service.NewOrderSvc(txm, userRepo, sessionRepo, seatRepo, seatLockRepo, couponRepo, orderRepo)
-	paymentSvc := service.NewPaymentSvc(txm, paymentRepo, callbackRepo, orderRepo, seatLockRepo, couponRepo, pointsRepo)
+	paymentSvc := service.NewPaymentSvc(txm, paymentRepo, callbackRepo, orderRepo, seatLockRepo, couponRepo, pointsRepo, boxOfficeRepo)
 	authSvc := service.NewAuthSvc(userRepo, adminRepo, roleRepo, tokens)
 	if err := authSvc.EnsureDefaultAdmin(context.Background()); err != nil {
 		log.Printf("ensure default admin: %v", err)
@@ -77,11 +80,13 @@ func NewApp() (*App, error) {
 
 	movieSvc := service.NewAdminMovieSvc(movieRepo, operationLogRepo)
 	hallSvc := service.NewAdminHallSvc(hallRepo, seatRepo, operationLogRepo)
-	sessionSvc := service.NewAdminSessionSvc(sessionRepo, movieRepo, hallRepo, seatLockRepo, orderRepo, couponRepo, refundRepo, paymentRepo, pointsRepo, operationLogRepo)
+	sessionSvc := service.NewAdminSessionSvc(sessionRepo, movieRepo, hallRepo, seatLockRepo, orderRepo, couponRepo, refundRepo, paymentRepo, pointsRepo, boxOfficeRepo, operationLogRepo)
 	seatMapSvc := service.NewSeatMapSvc(sessionRepo, seatRepo, seatLockRepo, movieRepo, hallRepo)
 	homeSvc := service.NewHomeSvc(bannerRepo, movieRepo, orderRepo)
 	bannerSvc := service.NewAdminBannerSvc(bannerRepo, operationLogRepo)
-	pointsSvc := service.NewPointsSvc(pointsRepo)
+	pointsSvc := service.NewPointsSvc(txm, pointsRepo, couponRepo)
+	refundSvc := service.NewRefundSvc(txm, orderRepo, refundRepo, paymentRepo, seatLockRepo, pointsRepo, sessionRepo, boxOfficeRepo)
+	boxOfficeSvc := service.NewBoxOfficeSvc(boxOfficeRepo)
 
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
@@ -93,8 +98,24 @@ func NewApp() (*App, error) {
 	homeHandler := handler.NewHomeHandler(homeSvc)
 	bannerHandler := handler.NewAdminBannerHandler(bannerSvc)
 	pointsHandler := handler.NewPointsHandler(pointsSvc)
+	refundHandler := handler.NewRefundHandler(refundSvc)
+	dashboardHandler := handler.NewDashboardHandler(boxOfficeSvc)
 	authMw := middleware.NewAuthMiddleware(tokens)
 
-	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler)
-	return &App{Engine: engine, DB: db, Addr: addr}, nil
+	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler, refundHandler, dashboardHandler)
+
+	runner := job.NewRunner()
+	runner.Add("order_timeout", func(ctx context.Context) error {
+		_, err := orderSvc.ExpireOverdueOrders(ctx, time.Now())
+		return err
+	})
+	runner.Add("payment_callback_retry", func(ctx context.Context) error {
+		_, err := paymentSvc.RetryCallbacks(ctx, 50)
+		return err
+	})
+	runner.Add("box_office_reconcile", func(ctx context.Context) error {
+		return boxOfficeSvc.Reconcile(ctx)
+	})
+
+	return &App{Engine: engine, DB: db, Addr: addr, Jobs: runner}, nil
 }

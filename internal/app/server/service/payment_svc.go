@@ -21,6 +21,7 @@ type PaymentSvc struct {
 	locks     port.SeatLockRepo
 	coupons   port.UserCouponRepo
 	points    port.PointsRepo
+	box       port.BoxOfficeRepo
 }
 
 func NewPaymentSvc(
@@ -31,6 +32,7 @@ func NewPaymentSvc(
 	locks port.SeatLockRepo,
 	coupons port.UserCouponRepo,
 	points port.PointsRepo,
+	box port.BoxOfficeRepo,
 ) *PaymentSvc {
 	return &PaymentSvc{
 		tx:        tx,
@@ -40,6 +42,7 @@ func NewPaymentSvc(
 		locks:     locks,
 		coupons:   coupons,
 		points:    points,
+		box:       box,
 	}
 }
 
@@ -114,7 +117,14 @@ func (s *PaymentSvc) HandleMockCallback(ctx context.Context, in MockCallbackInpu
 			return err
 		}
 		if !inserted {
-			return nil // 重复回调：按幂等成功返回
+			existing, err := s.callbacks.GetByEventID(txCtx, cb.EventID)
+			if err != nil {
+				return err
+			}
+			if existing.Status == domain.CallbackProcessed {
+				return nil // 已处理：按幂等成功返回
+			}
+			// RECEIVED/FAILED：继续处理（重试场景）
 		}
 
 		payment, err := s.payments.GetByTransactionNo(txCtx, in.TransactionNo)
@@ -174,9 +184,40 @@ func (s *PaymentSvc) HandleMockCallback(ctx context.Context, in MockCallbackInpu
 		if err := s.points.GrantOnPaid(txCtx, order.UserID, order.PaidCents, order.OrderNo); err != nil {
 			return err
 		}
+		if err := s.box.Record(txCtx, domain.NewPaidEvent(order, order.OrderNo, time.Now())); err != nil {
+			return err
+		}
 
 		return s.callbacks.MarkProcessed(txCtx, cb.EventID)
 	})
+}
+
+const maxCallbackRetryAttempts = 5
+
+// RetryCallbacks 定时任务：重试未处理/失败的回调，返回失败数量。
+func (s *PaymentSvc) RetryCallbacks(ctx context.Context, limit int) (int, error) {
+	callbacks, err := s.callbacks.ListPending(ctx, limit)
+	if err != nil {
+		return 0, err
+	}
+	failed := 0
+	for _, cb := range callbacks {
+		if cb.RetryCount >= maxCallbackRetryAttempts {
+			continue
+		}
+		if err := s.HandleMockCallback(ctx, MockCallbackInput{
+			EventID:       cb.EventID,
+			TransactionNo: cb.TransactionNo,
+			AmountCents:   cb.AmountCents,
+			Payload:       cb.Payload,
+		}); err != nil {
+			failed++
+			if err := s.callbacks.IncrementRetry(ctx, cb.EventID); err != nil {
+				return failed, err
+			}
+		}
+	}
+	return failed, nil
 }
 
 // MockPay 模拟支付页确认：生成回调事件并走完整回调链路（幂等）。

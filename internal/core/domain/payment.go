@@ -78,6 +78,7 @@ type PaymentCallback struct {
 	AmountCents   int64
 	Payload       string
 	Status        CallbackStatus
+	RetryCount    int
 	CreatedAt     time.Time
 	ProcessedAt   *time.Time
 }

@@ -134,11 +134,12 @@ func (f *fakeSeatRepo) SyncSeats(ctx context.Context, hallID int64, seats []doma
 }
 
 type fakeSeatLockRepo struct {
-	lockErr  error
-	locked   []domain.SeatLock
-	booked   []string
-	released []int64
-	active   []domain.SeatLock
+	lockErr        error
+	locked         []domain.SeatLock
+	booked         []string
+	released       []int64
+	releasedOrders []string
+	active         []domain.SeatLock
 }
 
 func (f *fakeSeatLockRepo) CreateLocks(ctx context.Context, locks []domain.SeatLock) error {
@@ -155,6 +156,7 @@ func (f *fakeSeatLockRepo) MarkBookedByOrderNo(ctx context.Context, orderNo stri
 }
 
 func (f *fakeSeatLockRepo) ReleaseByOrderNo(ctx context.Context, orderNo string, status domain.SeatLockStatus) error {
+	f.releasedOrders = append(f.releasedOrders, orderNo)
 	return nil
 }
 
@@ -176,6 +178,7 @@ func (f *fakeSeatLockRepo) ListActiveBySessionID(ctx context.Context, sessionID 
 type fakeCouponRepo struct {
 	coupons   map[string]*domain.UserCoupon
 	templates map[int64]*domain.CouponTemplate
+	instances map[string]*domain.UserCoupon
 	lockErr   error
 	unlocked  []string
 }
@@ -192,6 +195,25 @@ func (f *fakeCouponRepo) GetTemplateByID(ctx context.Context, templateID int64) 
 		return t, nil
 	}
 	return nil, domain.ErrCouponNotAvailable
+}
+
+func (f *fakeCouponRepo) ListRedeemableTemplates(ctx context.Context) ([]domain.CouponTemplate, error) {
+	out := make([]domain.CouponTemplate, 0)
+	for _, t := range f.templates {
+		if t.Redeemable {
+			out = append(out, *t)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeCouponRepo) CreateInstance(ctx context.Context, coupon *domain.UserCoupon) error {
+	if f.instances == nil {
+		f.instances = make(map[string]*domain.UserCoupon)
+	}
+	coupon.ID = int64(len(f.instances) + 1)
+	f.instances[coupon.CouponNo] = coupon
+	return nil
 }
 
 func (f *fakeCouponRepo) LockForOrder(ctx context.Context, couponNo, orderNo string) error {
@@ -252,6 +274,16 @@ func (f *fakeOrderRepo) Transition(ctx context.Context, orderNo string, from, to
 	o.Status = to
 	o.Version++
 	return nil
+}
+
+func (f *fakeOrderRepo) ListExpiredPending(ctx context.Context, now time.Time) ([]domain.Order, error) {
+	out := make([]domain.Order, 0)
+	for _, o := range f.orders {
+		if o.Status == domain.OrderPendingPayment && o.ExpireAt.Before(now) {
+			out = append(out, *o)
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeOrderRepo) IssueTickets(ctx context.Context, orderNo string, tickets []domain.OrderItem) error {

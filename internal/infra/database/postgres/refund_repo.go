@@ -2,10 +2,12 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
 	"github.com/NeverENG/CinemaBookingApp/internal/core/port"
+	"gorm.io/gorm"
 )
 
 type refundRow struct {
@@ -52,6 +54,30 @@ func (r *RefundRepo) Create(ctx context.Context, refund *domain.Refund) error {
 	return r.db.db(ctx).Create(&row).Error
 }
 
+func (r *RefundRepo) GetByRefundNo(ctx context.Context, refundNo string) (*domain.Refund, error) {
+	var row refundRow
+	err := r.db.db(ctx).Where("refund_no = ?", refundNo).First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, domain.ErrRefundNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toDomainRefund(row), nil
+}
+
+func (r *RefundRepo) GetByOrderNo(ctx context.Context, orderNo string) (*domain.Refund, error) {
+	var row refundRow
+	err := r.db.db(ctx).Where("order_no = ?", orderNo).First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, domain.ErrRefundNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toDomainRefund(row), nil
+}
+
 func (r *RefundRepo) MarkSuccess(ctx context.Context, refundNo string) error {
 	now := time.Now()
 	return r.db.db(ctx).
@@ -61,4 +87,16 @@ func (r *RefundRepo) MarkSuccess(ctx context.Context, refundNo string) error {
 			"status":      domain.RefundSuccess,
 			"refunded_at": now,
 		}).Error
+}
+
+func toDomainRefund(row refundRow) *domain.Refund {
+	return &domain.Refund{
+		RefundNo:         row.RefundNo,
+		OrderNo:          row.OrderNo,
+		UserID:           row.UserID,
+		AmountCents:      row.AmountCents,
+		Reason:           row.Reason,
+		Status:           row.Status,
+		ExternalRefundNo: row.ExternalRefundNo,
+	}
 }

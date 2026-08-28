@@ -15,6 +15,9 @@ type CouponTemplate struct {
 	PercentBp        int   // PERCENT 折扣万分比（9000 = 9 折）
 	MinSpendCents    int64 // 使用门槛
 	MaxDiscountCents int64 // 折扣封顶，0 = 不封顶
+	Redeemable       bool  // 是否可积分兑换
+	RedeemPoints     int   // 兑换所需积分
+	ValidDays        int   // 发放后有效期（天）
 	TotalQty         int
 	PerUserLimit     int
 	Status           string

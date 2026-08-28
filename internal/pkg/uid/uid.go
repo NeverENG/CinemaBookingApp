@@ -36,6 +36,16 @@ func EventID() string {
 	return "EV" + randHex(8)
 }
 
+// CouponNo 生成优惠券实例号。
+func CouponNo() string {
+	return "C" + randHex(8)
+}
+
+// ExchangeNo 生成兑换单号。
+func ExchangeNo() string {
+	return "EX" + time.Now().Format("20060102150405") + randHex(4)
+}
+
 func randHex(n int) string {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {

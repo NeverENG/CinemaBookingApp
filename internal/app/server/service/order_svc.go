@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/biz"
@@ -194,4 +195,47 @@ func (s *OrderSvc) GetOrder(ctx context.Context, userID int64, orderNo string) (
 		return nil, domain.ErrForbidden
 	}
 	return order, nil
+}
+
+// ExpireOverdueOrders 定时任务：过期待支付订单 → EXPIRED，释放锁、解锁券。
+func (s *OrderSvc) ExpireOverdueOrders(ctx context.Context, now time.Time) (int, error) {
+	expired, err := s.orders.ListExpiredPending(ctx, now)
+	if err != nil {
+		return 0, err
+	}
+	processed := 0
+	for _, candidate := range expired {
+		err := s.tx.Run(ctx, func(txCtx context.Context) error {
+			order, err := s.orders.GetOrderByNo(txCtx, candidate.OrderNo)
+			if err != nil {
+				if errors.Is(err, domain.ErrOrderNotFound) {
+					return nil
+				}
+				return err
+			}
+			if order.Status != domain.OrderPendingPayment {
+				return nil // 已被其他路径处理
+			}
+			if err := order.Transition(domain.OrderEventTimeout); err != nil {
+				return err
+			}
+			if err := s.orders.Transition(txCtx, order.OrderNo, domain.OrderPendingPayment, domain.OrderExpired, order.Version); err != nil {
+				return err
+			}
+			if err := s.locks.ReleaseByOrderNo(txCtx, order.OrderNo, domain.SeatLockReleased); err != nil {
+				return err
+			}
+			if order.CouponInstanceID != nil {
+				if err := s.coupons.UnlockByOrderNo(txCtx, order.OrderNo); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return processed, err
+		}
+		processed++
+	}
+	return processed, nil
 }

@@ -78,6 +78,30 @@ func (f *fakeCallbackRepo) MarkFailed(ctx context.Context, eventID, reason strin
 	return nil
 }
 
+func (f *fakeCallbackRepo) GetByEventID(ctx context.Context, eventID string) (*domain.PaymentCallback, error) {
+	if cb, ok := f.callbacks[eventID]; ok {
+		return cb, nil
+	}
+	return nil, domain.ErrPaymentNotFound
+}
+
+func (f *fakeCallbackRepo) ListPending(ctx context.Context, limit int) ([]domain.PaymentCallback, error) {
+	out := make([]domain.PaymentCallback, 0)
+	for _, cb := range f.callbacks {
+		if (cb.Status == domain.CallbackReceived || cb.Status == domain.CallbackFailed) && cb.RetryCount < 5 {
+			out = append(out, *cb)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeCallbackRepo) IncrementRetry(ctx context.Context, eventID string) error {
+	if cb, ok := f.callbacks[eventID]; ok {
+		cb.RetryCount++
+	}
+	return nil
+}
+
 type fakePointsRepo struct {
 	granted   []string
 	reclaimed []string
@@ -93,6 +117,14 @@ func (f *fakePointsRepo) GrantOnPaid(ctx context.Context, userID int64, paidCent
 func (f *fakePointsRepo) ReclaimOnRefund(ctx context.Context, userID int64, refundCents int64, refundNo string) error {
 	f.reclaimed = append(f.reclaimed, refundNo)
 	return nil
+}
+
+func (f *fakePointsRepo) Exchange(ctx context.Context, userID int64, points int, exchangeNo string) (int, error) {
+	if f.balance < points {
+		return 0, domain.ErrInsufficientPoints
+	}
+	f.balance -= points
+	return f.balance, nil
 }
 
 func (f *fakePointsRepo) GetBalance(ctx context.Context, userID int64) (int, error) {
@@ -127,14 +159,15 @@ func newPaymentTestSvc(
 	locks *fakeSeatLockRepo,
 	coupons *fakeCouponRepo,
 	points *fakePointsRepo,
+	box *fakeBoxOfficeRepo,
 ) *PaymentSvc {
-	return NewPaymentSvc(fakeTxManager{}, payments, callbacks, orders, locks, coupons, points)
+	return NewPaymentSvc(fakeTxManager{}, payments, callbacks, orders, locks, coupons, points, box)
 }
 
 func TestCreatePaymentIdempotent(t *testing.T) {
 	orders := &fakeOrderRepo{orders: map[string]*domain.Order{"O1": paidOrderFixture()}}
 	payments := &fakePaymentRepo{}
-	svc := newPaymentTestSvc(orders, payments, &fakeCallbackRepo{}, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{})
+	svc := newPaymentTestSvc(orders, payments, &fakeCallbackRepo{}, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{})
 
 	tx, err := svc.CreatePayment(context.Background(), CreatePaymentInput{OrderNo: "O1"})
 	if err != nil {
@@ -157,7 +190,7 @@ func TestCreatePaymentExpiredOrder(t *testing.T) {
 	order := paidOrderFixture()
 	order.ExpireAt = time.Now().Add(-time.Minute)
 	orders := &fakeOrderRepo{orders: map[string]*domain.Order{"O1": order}}
-	svc := newPaymentTestSvc(orders, &fakePaymentRepo{}, &fakeCallbackRepo{}, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{})
+	svc := newPaymentTestSvc(orders, &fakePaymentRepo{}, &fakeCallbackRepo{}, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{})
 
 	_, err := svc.CreatePayment(context.Background(), CreatePaymentInput{OrderNo: "O1"})
 	if !errors.Is(err, domain.ErrOrderExpired) {
@@ -171,12 +204,13 @@ func TestHandleMockCallbackHappyPath(t *testing.T) {
 	callbacks := &fakeCallbackRepo{}
 	locks := &fakeSeatLockRepo{}
 	points := &fakePointsRepo{}
+	box := &fakeBoxOfficeRepo{}
 	coupons := &fakeCouponRepo{
 		coupons: map[string]*domain.UserCoupon{
 			"C001": {ID: 1, CouponNo: "C001", UserID: 1, Status: domain.CouponLocked, OrderNo: "O1"},
 		},
 	}
-	svc := newPaymentTestSvc(orders, payments, callbacks, locks, coupons, points)
+	svc := newPaymentTestSvc(orders, payments, callbacks, locks, coupons, points, box)
 
 	tx, err := svc.CreatePayment(context.Background(), CreatePaymentInput{OrderNo: "O1"})
 	if err != nil {
@@ -213,13 +247,16 @@ func TestHandleMockCallbackHappyPath(t *testing.T) {
 	if len(points.granted) != 1 || points.granted[0] != "O1" {
 		t.Fatalf("expected points granted for O1, got %v", points.granted)
 	}
+	if len(box.events) != 1 || box.events[0].BizType != domain.BoxOrderPaid || box.events[0].GrossDelta != 10000 {
+		t.Fatalf("expected paid box event, got %+v", box.events)
+	}
 }
 
 func TestHandleMockCallbackDuplicateEvent(t *testing.T) {
 	orders := &fakeOrderRepo{orders: map[string]*domain.Order{"O1": paidOrderFixture()}}
 	payments := &fakePaymentRepo{}
 	callbacks := &fakeCallbackRepo{}
-	svc := newPaymentTestSvc(orders, payments, callbacks, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{})
+	svc := newPaymentTestSvc(orders, payments, callbacks, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{})
 
 	tx, _ := svc.CreatePayment(context.Background(), CreatePaymentInput{OrderNo: "O1"})
 	in := MockCallbackInput{EventID: "E1", TransactionNo: tx.TransactionNo, AmountCents: 10000}
@@ -238,7 +275,7 @@ func TestHandleMockCallbackDuplicateEvent(t *testing.T) {
 func TestHandleMockCallbackAmountMismatch(t *testing.T) {
 	orders := &fakeOrderRepo{orders: map[string]*domain.Order{"O1": paidOrderFixture()}}
 	payments := &fakePaymentRepo{}
-	svc := newPaymentTestSvc(orders, payments, &fakeCallbackRepo{}, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{})
+	svc := newPaymentTestSvc(orders, payments, &fakeCallbackRepo{}, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{})
 
 	tx, _ := svc.CreatePayment(context.Background(), CreatePaymentInput{OrderNo: "O1"})
 	err := svc.HandleMockCallback(context.Background(), MockCallbackInput{
@@ -258,7 +295,7 @@ func TestMockPay(t *testing.T) {
 	orders := &fakeOrderRepo{orders: map[string]*domain.Order{"O1": paidOrderFixture()}}
 	payments := &fakePaymentRepo{}
 	callbacks := &fakeCallbackRepo{}
-	svc := newPaymentTestSvc(orders, payments, callbacks, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{})
+	svc := newPaymentTestSvc(orders, payments, callbacks, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{})
 
 	tx, _ := svc.CreatePayment(context.Background(), CreatePaymentInput{OrderNo: "O1"})
 	if err := svc.MockPay(context.Background(), 1, tx.TransactionNo); err != nil {
@@ -275,7 +312,7 @@ func TestMockPay(t *testing.T) {
 func TestMockPayWrongUser(t *testing.T) {
 	orders := &fakeOrderRepo{orders: map[string]*domain.Order{"O1": paidOrderFixture()}}
 	payments := &fakePaymentRepo{}
-	svc := newPaymentTestSvc(orders, payments, &fakeCallbackRepo{}, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{})
+	svc := newPaymentTestSvc(orders, payments, &fakeCallbackRepo{}, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{})
 
 	tx, _ := svc.CreatePayment(context.Background(), CreatePaymentInput{OrderNo: "O1"})
 	if err := svc.MockPay(context.Background(), 999, tx.TransactionNo); !errors.Is(err, domain.ErrForbidden) {
@@ -286,7 +323,7 @@ func TestMockPayWrongUser(t *testing.T) {
 func TestGetByOrderOwnership(t *testing.T) {
 	orders := &fakeOrderRepo{orders: map[string]*domain.Order{"O1": paidOrderFixture()}}
 	payments := &fakePaymentRepo{}
-	svc := newPaymentTestSvc(orders, payments, &fakeCallbackRepo{}, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{})
+	svc := newPaymentTestSvc(orders, payments, &fakeCallbackRepo{}, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{})
 
 	tx, _ := svc.CreatePayment(context.Background(), CreatePaymentInput{OrderNo: "O1"})
 	if _, err := svc.GetByOrder(context.Background(), 1, "O1"); err != nil {

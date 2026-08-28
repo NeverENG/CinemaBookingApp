@@ -50,6 +50,45 @@ func (r *PointsRepo) ReclaimOnRefund(ctx context.Context, userID int64, refundCe
 	return r.apply(ctx, userID, change, domain.PointsOrderRefund, refundNo, false)
 }
 
+// Exchange 兑换扣积分：校验余额 → 写负流水（幂等）→ 更新余额，返回兑换后余额。
+func (r *PointsRepo) Exchange(ctx context.Context, userID int64, points int, exchangeNo string) (int, error) {
+	if points <= 0 {
+		return 0, domain.ErrInsufficientPoints
+	}
+	db := r.db.db(ctx)
+	var user userRow
+	if err := db.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", userID).
+		First(&user).Error; err != nil {
+		return 0, err
+	}
+	if user.PointsBalance < points {
+		return 0, domain.ErrInsufficientPoints
+	}
+	balance := user.PointsBalance - points
+
+	row := pointsLedgerRow{
+		UserID:       userID,
+		ChangePoints: -points,
+		BalanceAfter: balance,
+		BizType:      domain.PointsExchange,
+		BizNo:        exchangeNo,
+		CreatedAt:    time.Now(),
+	}
+	if err := db.Create(&row).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return user.PointsBalance, nil // 重复兑换请求：已扣过，幂等成功
+		}
+		return 0, err
+	}
+	if err := db.Model(&userRow{}).
+		Where("id = ?", userID).
+		Update("points_balance", balance).Error; err != nil {
+		return 0, err
+	}
+	return balance, nil
+}
+
 // apply 行锁用户 → 计算余额 → 写流水（唯一键幂等）→ 更新用户冗余快照。
 func (r *PointsRepo) apply(ctx context.Context, userID int64, change int, bizType domain.PointsBizType, bizNo string, earned bool) error {
 	db := r.db.db(ctx)

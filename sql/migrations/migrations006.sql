@@ -1,0 +1,5 @@
+-- 积分兑换（migrations006）
+
+ALTER TABLE coupon_templates ADD COLUMN IF NOT EXISTS redeemable    BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE coupon_templates ADD COLUMN IF NOT EXISTS redeem_points INT NOT NULL DEFAULT 0;
+ALTER TABLE coupon_templates ADD COLUMN IF NOT EXISTS valid_days    INT NOT NULL DEFAULT 30;

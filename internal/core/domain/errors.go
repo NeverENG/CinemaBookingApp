@@ -39,4 +39,9 @@ var (
 
 	ErrBannerNotFound = errors.New("banner not found")
 	ErrBannerInvalid  = errors.New("banner invalid")
+
+	ErrInsufficientPoints = errors.New("insufficient points")
+
+	ErrOrderNotRefundable = errors.New("order not refundable")
+	ErrRefundExists       = errors.New("refund already exists")
 )

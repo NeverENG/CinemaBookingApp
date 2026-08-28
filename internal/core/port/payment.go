@@ -18,6 +18,10 @@ type PaymentRepo interface {
 type PaymentCallbackRepo interface {
 	// InsertIfAbsent 已存在返回 (false, nil)，首次插入返回 (true, nil)。
 	InsertIfAbsent(ctx context.Context, cb *domain.PaymentCallback) (bool, error)
+	GetByEventID(ctx context.Context, eventID string) (*domain.PaymentCallback, error)
+	// ListPending 待重试回调（RECEIVED/FAILED 且重试次数未达上限）。
+	ListPending(ctx context.Context, limit int) ([]domain.PaymentCallback, error)
+	IncrementRetry(ctx context.Context, eventID string) error
 	MarkProcessed(ctx context.Context, eventID string) error
 	MarkFailed(ctx context.Context, eventID, reason string) error
 }

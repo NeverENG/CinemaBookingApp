@@ -112,6 +112,22 @@ func (f *fakeRefundRepo) Create(ctx context.Context, refund *domain.Refund) erro
 	return nil
 }
 
+func (f *fakeRefundRepo) GetByRefundNo(ctx context.Context, refundNo string) (*domain.Refund, error) {
+	if r, ok := f.refunds[refundNo]; ok {
+		return r, nil
+	}
+	return nil, domain.ErrRefundNotFound
+}
+
+func (f *fakeRefundRepo) GetByOrderNo(ctx context.Context, orderNo string) (*domain.Refund, error) {
+	for _, r := range f.refunds {
+		if r.OrderNo == orderNo {
+			return r, nil
+		}
+	}
+	return nil, domain.ErrRefundNotFound
+}
+
 func (f *fakeRefundRepo) MarkSuccess(ctx context.Context, refundNo string) error {
 	if r, ok := f.refunds[refundNo]; ok {
 		r.Status = domain.RefundSuccess
@@ -206,7 +222,7 @@ func TestAdminSessionCreate(t *testing.T) {
 	halls := &fakeHallRepo{halls: map[int64]*domain.Hall{
 		10: {ID: 10, CinemaID: 100, Name: "1号厅"},
 	}}
-	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeOperationLogRepo{})
+	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeOperationLogRepo{})
 
 	session, err := svc.Create(context.Background(), superAdminScope, SessionInput{
 		CinemaID:       100,
@@ -235,7 +251,7 @@ func TestAdminSessionCreateOverlap(t *testing.T) {
 	halls := &fakeHallRepo{halls: map[int64]*domain.Hall{
 		10: {ID: 10, CinemaID: 100, Name: "1号厅"},
 	}}
-	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeOperationLogRepo{})
+	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeOperationLogRepo{})
 
 	_, err := svc.Create(context.Background(), superAdminScope, SessionInput{
 		CinemaID:       100,
@@ -268,8 +284,9 @@ func TestAdminSessionCancel(t *testing.T) {
 		"T2": {TransactionNo: "T2", OrderNo: "O2", Status: domain.PaymentSuccess, Version: 1},
 	}}
 	points := &fakePointsRepo{}
+	box := &fakeBoxOfficeRepo{}
 	logs := &fakeOperationLogRepo{}
-	svc := NewAdminSessionSvc(sessions, movies, halls, locks, orders, coupons, refunds, payments, points, logs)
+	svc := NewAdminSessionSvc(sessions, movies, halls, locks, orders, coupons, refunds, payments, points, box, logs)
 
 	if err := svc.Cancel(context.Background(), superAdminScope, 5); err != nil {
 		t.Fatalf("cancel session: %v", err)
@@ -297,6 +314,9 @@ func TestAdminSessionCancel(t *testing.T) {
 	}
 	if len(points.reclaimed) != 1 {
 		t.Fatal("expected points reclaimed on refund")
+	}
+	if len(box.events) != 1 || box.events[0].BizType != domain.BoxOrderRefund || box.events[0].RefundDelta != 5000 {
+		t.Fatalf("expected refund box event, got %+v", box.events)
 	}
 }
 

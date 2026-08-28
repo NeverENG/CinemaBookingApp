@@ -24,6 +24,7 @@ type AdminSessionSvc struct {
 	refunds  port.RefundRepo
 	payments port.PaymentRepo
 	points   port.PointsRepo
+	box      port.BoxOfficeRepo
 	logs     port.OperationLogRepo
 }
 
@@ -37,6 +38,7 @@ func NewAdminSessionSvc(
 	refunds port.RefundRepo,
 	payments port.PaymentRepo,
 	points port.PointsRepo,
+	box port.BoxOfficeRepo,
 	logs port.OperationLogRepo,
 ) *AdminSessionSvc {
 	return &AdminSessionSvc{
@@ -49,6 +51,7 @@ func NewAdminSessionSvc(
 		refunds:  refunds,
 		payments: payments,
 		points:   points,
+		box:      box,
 		logs:     logs,
 	}
 }
@@ -184,6 +187,9 @@ func (s *AdminSessionSvc) refundOrder(ctx context.Context, order domain.Order) e
 		return err
 	}
 	if err := s.points.ReclaimOnRefund(ctx, order.UserID, refund.AmountCents, refund.RefundNo); err != nil {
+		return err
+	}
+	if err := s.box.Record(ctx, domain.NewRefundEvent(&order, refund.AmountCents, refund.RefundNo, time.Now())); err != nil {
 		return err
 	}
 

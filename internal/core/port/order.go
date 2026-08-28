@@ -2,6 +2,7 @@ package port
 
 import (
 	"context"
+	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
 )
@@ -12,6 +13,7 @@ type OrderRepo interface {
 	CreateOrder(ctx context.Context, order *domain.Order) error
 	GetOrderByNo(ctx context.Context, orderNo string) (*domain.Order, error)
 	Transition(ctx context.Context, orderNo string, from, to domain.OrderStatus, version int32) error
+	ListExpiredPending(ctx context.Context, now time.Time) ([]domain.Order, error)
 	IssueTickets(ctx context.Context, orderNo string, tickets []domain.OrderItem) error
 	ExpirePendingBySessionID(ctx context.Context, sessionID int64) ([]string, error)
 	ListPaidBySessionID(ctx context.Context, sessionID int64) ([]domain.Order, error)

@@ -7,6 +7,7 @@ type PointsBizType string
 const (
 	PointsOrderPaid   PointsBizType = "ORDER_PAID"
 	PointsOrderRefund PointsBizType = "ORDER_REFUND"
+	PointsExchange    PointsBizType = "EXCHANGE"
 )
 
 // PointsPerYuan 每实付 1 元赠送 1 积分（可配置）。

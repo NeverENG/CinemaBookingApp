@@ -25,7 +25,7 @@ type hallRequest struct {
 }
 
 func (h *AdminHallHandler) Create(c *gin.Context) {
-	adminID, ok := adminIDFrom(c)
+	scope, ok := adminScopeFrom(c)
 	if !ok {
 		resp.Fail(c, http.StatusUnauthorized, "missing admin")
 		return
@@ -35,7 +35,7 @@ func (h *AdminHallHandler) Create(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	hall, err := h.halls.Create(c.Request.Context(), adminID, service.HallInput{
+	hall, err := h.halls.Create(c.Request.Context(), scope, service.HallInput{
 		CinemaID:   req.CinemaID,
 		Name:       req.Name,
 		SeatLayout: req.SeatLayout,
@@ -53,7 +53,12 @@ func (h *AdminHallHandler) List(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, "cinema_id required")
 		return
 	}
-	halls, err := h.halls.ListByCinema(c.Request.Context(), cinemaID)
+	scope, ok := adminScopeFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "missing admin")
+		return
+	}
+	halls, err := h.halls.ListByCinema(c.Request.Context(), scope, cinemaID)
 	if err != nil {
 		resp.Error(c, err)
 		return
@@ -62,7 +67,7 @@ func (h *AdminHallHandler) List(c *gin.Context) {
 }
 
 func (h *AdminHallHandler) Update(c *gin.Context) {
-	adminID, ok := adminIDFrom(c)
+	scope, ok := adminScopeFrom(c)
 	if !ok {
 		resp.Fail(c, http.StatusUnauthorized, "missing admin")
 		return
@@ -77,7 +82,7 @@ func (h *AdminHallHandler) Update(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	hall, err := h.halls.Update(c.Request.Context(), adminID, hallID, service.HallInput{
+	hall, err := h.halls.Update(c.Request.Context(), scope, hallID, service.HallInput{
 		CinemaID:   req.CinemaID,
 		Name:       req.Name,
 		SeatLayout: req.SeatLayout,

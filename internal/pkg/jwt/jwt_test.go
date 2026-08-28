@@ -7,7 +7,7 @@ import (
 
 func TestGenerateAndParse(t *testing.T) {
 	m := New("test-secret", time.Hour)
-	token, err := m.Generate(42, "SUPER_ADMIN")
+	token, err := m.Generate(42, "SUPER_ADMIN", nil)
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -23,7 +23,7 @@ func TestGenerateAndParse(t *testing.T) {
 func TestParseWrongSecret(t *testing.T) {
 	m := New("test-secret", time.Hour)
 	other := New("other-secret", time.Hour)
-	token, _ := m.Generate(1, "USER")
+	token, _ := m.Generate(1, "USER", nil)
 	if _, err := other.Parse(token); err == nil {
 		t.Fatal("expected error for wrong secret")
 	}

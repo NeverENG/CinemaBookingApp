@@ -3,10 +3,33 @@ package postgres
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"gorm.io/gorm"
 )
+
+// ApplyAllMigrations 按文件名顺序执行 sql/migrations 下全部 .sql。
+func ApplyAllMigrations(db *gorm.DB, dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	var files []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") {
+			files = append(files, filepath.Join(dir, e.Name()))
+		}
+	}
+	sort.Strings(files)
+	for _, f := range files {
+		if err := ApplyMigrations(db, f); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // ApplyMigrations 逐个执行迁移文件中的 SQL 语句（按 ; 切分，忽略注释）。
 func ApplyMigrations(db *gorm.DB, path string) error {

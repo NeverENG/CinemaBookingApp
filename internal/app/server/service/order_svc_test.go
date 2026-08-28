@@ -221,6 +221,13 @@ func (f *fakeOrderRepo) GetOrderByNo(ctx context.Context, orderNo string) (*doma
 }
 
 func (f *fakeOrderRepo) Transition(ctx context.Context, orderNo string, from, to domain.OrderStatus, version int32) error {
+	o := f.orders[orderNo]
+	if o == nil {
+		return domain.ErrOrderNotFound
+	}
+	// 与真实 DB 语义一致：条件更新由 SQL WHERE 保证，这里直接更新存储对象
+	o.Status = to
+	o.Version++
 	return nil
 }
 
@@ -250,6 +257,16 @@ func (f *fakeOrderRepo) ExpirePendingBySessionID(ctx context.Context, sessionID 
 		}
 	}
 	return nos, nil
+}
+
+func (f *fakeOrderRepo) ListPaidBySessionID(ctx context.Context, sessionID int64) ([]domain.Order, error) {
+	out := make([]domain.Order, 0)
+	for _, o := range f.orders {
+		if o.SessionID == sessionID && o.Status == domain.OrderPaid {
+			out = append(out, *o)
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeOrderRepo) ListOrdersByUserID(ctx context.Context, userID int64) ([]domain.Order, error) {

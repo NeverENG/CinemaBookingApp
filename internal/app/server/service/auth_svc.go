@@ -34,7 +34,7 @@ func (s *AuthSvc) UserLogin(ctx context.Context, username, password string) (str
 	if user.Status != "ACTIVE" || !crypto.CheckPassword(user.PasswordHash, password) {
 		return "", nil, domain.ErrInvalidCredentials
 	}
-	token, err := s.tokens.Generate(user.ID, roleUser)
+	token, err := s.tokens.Generate(user.ID, roleUser, nil)
 	if err != nil {
 		return "", nil, err
 	}
@@ -54,7 +54,7 @@ func (s *AuthSvc) AdminLogin(ctx context.Context, username, password string) (st
 		return "", nil, domain.ErrInvalidCredentials
 	}
 	admin.RoleCode = role.Code
-	token, err := s.tokens.Generate(admin.ID, role.Code)
+	token, err := s.tokens.Generate(admin.ID, role.Code, admin.CinemaID)
 	if err != nil {
 		return "", nil, err
 	}

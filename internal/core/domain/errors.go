@@ -33,4 +33,7 @@ var (
 	ErrSessionTimeConflict    = errors.New("session time conflict")
 	ErrSessionLockedForChange = errors.New("session locked for change")
 	ErrSessionInvalid         = errors.New("session invalid")
+
+	ErrForbidden      = errors.New("forbidden")
+	ErrRefundNotFound = errors.New("refund not found")
 )

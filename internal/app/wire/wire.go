@@ -58,6 +58,7 @@ func NewApp() (*App, error) {
 	movieRepo := postgres.NewMovieRepo(pg)
 	hallRepo := postgres.NewHallRepo(pg)
 	operationLogRepo := postgres.NewOperationLogRepo(pg)
+	refundRepo := postgres.NewRefundRepo(pg)
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -74,7 +75,7 @@ func NewApp() (*App, error) {
 
 	movieSvc := service.NewAdminMovieSvc(movieRepo, operationLogRepo)
 	hallSvc := service.NewAdminHallSvc(hallRepo, seatRepo, operationLogRepo)
-	sessionSvc := service.NewAdminSessionSvc(sessionRepo, movieRepo, hallRepo, seatLockRepo, orderRepo, couponRepo, operationLogRepo)
+	sessionSvc := service.NewAdminSessionSvc(sessionRepo, movieRepo, hallRepo, seatLockRepo, orderRepo, couponRepo, refundRepo, paymentRepo, operationLogRepo)
 
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)

@@ -14,5 +14,6 @@ type OrderRepo interface {
 	Transition(ctx context.Context, orderNo string, from, to domain.OrderStatus, version int32) error
 	IssueTickets(ctx context.Context, orderNo string, tickets []domain.OrderItem) error
 	ExpirePendingBySessionID(ctx context.Context, sessionID int64) ([]string, error)
+	ListPaidBySessionID(ctx context.Context, sessionID int64) ([]domain.Order, error)
 	ListOrdersByUserID(ctx context.Context, userID int64) ([]domain.Order, error)
 }

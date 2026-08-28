@@ -51,6 +51,8 @@ func Error(c *gin.Context, err error) {
 		Fail(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, domain.ErrInvalidCredentials):
 		Fail(c, http.StatusUnauthorized, err.Error())
+	case errors.Is(err, domain.ErrForbidden):
+		Fail(c, http.StatusForbidden, err.Error())
 	default:
 		Fail(c, http.StatusInternalServerError, "internal error")
 	}

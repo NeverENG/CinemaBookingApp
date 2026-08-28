@@ -26,6 +26,11 @@ func TicketNo() string {
 	return "TK" + randHex(6)
 }
 
+// RefundNo 生成退款单号。
+func RefundNo() string {
+	return "RF" + time.Now().Format("20060102150405") + randHex(4)
+}
+
 func randHex(n int) string {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {

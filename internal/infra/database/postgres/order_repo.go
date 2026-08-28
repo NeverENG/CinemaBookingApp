@@ -142,6 +142,20 @@ func (r *OrderRepo) ExpirePendingBySessionID(ctx context.Context, sessionID int6
 	return orderNos, err
 }
 
+func (r *OrderRepo) ListPaidBySessionID(ctx context.Context, sessionID int64) ([]domain.Order, error) {
+	var rows []orderRow
+	if err := r.db.db(ctx).
+		Where("session_id = ? AND status = ?", sessionID, domain.OrderPaid).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	orders := make([]domain.Order, 0, len(rows))
+	for _, row := range rows {
+		orders = append(orders, *toDomainOrder(row, nil))
+	}
+	return orders, nil
+}
+
 func (r *OrderRepo) ListOrdersByUserID(ctx context.Context, userID int64) ([]domain.Order, error) {
 	var rows []orderRow
 	if err := r.db.db(ctx).Where("user_id = ?", userID).Order("created_at DESC").Find(&rows).Error; err != nil {

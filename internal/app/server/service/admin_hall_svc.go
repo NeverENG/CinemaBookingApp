@@ -76,7 +76,10 @@ type HallInput struct {
 	SeatLayout string
 }
 
-func (s *AdminHallSvc) Create(ctx context.Context, adminID int64, in HallInput) (*domain.Hall, error) {
+func (s *AdminHallSvc) Create(ctx context.Context, scope domain.AdminScope, in HallInput) (*domain.Hall, error) {
+	if scope.IsCinemaAdmin() && (scope.CinemaID == nil || *scope.CinemaID != in.CinemaID) {
+		return nil, domain.ErrForbidden
+	}
 	layout, err := parseSeatLayout(in.SeatLayout)
 	if err != nil {
 		return nil, err
@@ -96,10 +99,10 @@ func (s *AdminHallSvc) Create(ctx context.Context, adminID int64, in HallInput) 
 	if err := s.seats.SyncSeats(ctx, hall.ID, buildSeats(layout)); err != nil {
 		return nil, err
 	}
-	return hall, s.log(ctx, adminID, "CREATE_HALL", "hall", strconv.FormatInt(hall.ID, 10), hall)
+	return hall, s.log(ctx, scope.AdminID, "CREATE_HALL", "hall", strconv.FormatInt(hall.ID, 10), hall)
 }
 
-func (s *AdminHallSvc) Update(ctx context.Context, adminID, hallID int64, in HallInput) (*domain.Hall, error) {
+func (s *AdminHallSvc) Update(ctx context.Context, scope domain.AdminScope, hallID int64, in HallInput) (*domain.Hall, error) {
 	layout, err := parseSeatLayout(in.SeatLayout)
 	if err != nil {
 		return nil, err
@@ -107,6 +110,10 @@ func (s *AdminHallSvc) Update(ctx context.Context, adminID, hallID int64, in Hal
 	hall, err := s.halls.GetByID(ctx, hallID)
 	if err != nil {
 		return nil, err
+	}
+	if scope.IsCinemaAdmin() &&
+		(scope.CinemaID == nil || *scope.CinemaID != hall.CinemaID || *scope.CinemaID != in.CinemaID) {
+		return nil, domain.ErrForbidden
 	}
 	hall.Name = in.Name
 	hall.SeatLayoutJSON = in.SeatLayout
@@ -119,10 +126,16 @@ func (s *AdminHallSvc) Update(ctx context.Context, adminID, hallID int64, in Hal
 	if err := s.seats.SyncSeats(ctx, hall.ID, buildSeats(layout)); err != nil {
 		return nil, err
 	}
-	return hall, s.log(ctx, adminID, "UPDATE_HALL", "hall", strconv.FormatInt(hall.ID, 10), hall)
+	return hall, s.log(ctx, scope.AdminID, "UPDATE_HALL", "hall", strconv.FormatInt(hall.ID, 10), hall)
 }
 
-func (s *AdminHallSvc) ListByCinema(ctx context.Context, cinemaID int64) ([]domain.Hall, error) {
+func (s *AdminHallSvc) ListByCinema(ctx context.Context, scope domain.AdminScope, cinemaID int64) ([]domain.Hall, error) {
+	if scope.IsCinemaAdmin() {
+		if scope.CinemaID == nil {
+			return nil, domain.ErrForbidden
+		}
+		cinemaID = *scope.CinemaID
+	}
 	return s.halls.ListByCinema(ctx, cinemaID)
 }
 

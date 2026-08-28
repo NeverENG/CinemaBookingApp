@@ -9,8 +9,9 @@ import (
 
 // Claims 业务声明：用户/管理员 ID + 角色。
 type Claims struct {
-	UserID int64  `json:"uid"`
-	Role   string `json:"role"`
+	UserID   int64  `json:"uid"`
+	Role     string `json:"role"`
+	CinemaID *int64 `json:"cid,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -24,11 +25,12 @@ func New(secret string, ttl time.Duration) *Manager {
 	return &Manager{secret: []byte(secret), ttl: ttl}
 }
 
-func (m *Manager) Generate(userID int64, role string) (string, error) {
+func (m *Manager) Generate(userID int64, role string, cinemaID *int64) (string, error) {
 	now := time.Now()
 	claims := Claims{
-		UserID: userID,
-		Role:   role,
+		UserID:   userID,
+		Role:     role,
+		CinemaID: cinemaID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(m.ttl)),

@@ -32,7 +32,7 @@ type movieRequest struct {
 }
 
 func (h *AdminMovieHandler) Create(c *gin.Context) {
-	adminID, ok := adminIDFrom(c)
+	scope, ok := adminScopeFrom(c)
 	if !ok {
 		resp.Fail(c, http.StatusUnauthorized, "missing admin")
 		return
@@ -47,7 +47,7 @@ func (h *AdminMovieHandler) Create(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	movie, err := h.movies.Create(c.Request.Context(), adminID, in)
+	movie, err := h.movies.Create(c.Request.Context(), scope.AdminID, in)
 	if err != nil {
 		resp.Error(c, err)
 		return
@@ -65,7 +65,7 @@ func (h *AdminMovieHandler) List(c *gin.Context) {
 }
 
 func (h *AdminMovieHandler) Update(c *gin.Context) {
-	adminID, ok := adminIDFrom(c)
+	scope, ok := adminScopeFrom(c)
 	if !ok {
 		resp.Fail(c, http.StatusUnauthorized, "missing admin")
 		return
@@ -85,7 +85,7 @@ func (h *AdminMovieHandler) Update(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	movie, err := h.movies.Update(c.Request.Context(), adminID, movieID, in)
+	movie, err := h.movies.Update(c.Request.Context(), scope.AdminID, movieID, in)
 	if err != nil {
 		resp.Error(c, err)
 		return
@@ -94,7 +94,7 @@ func (h *AdminMovieHandler) Update(c *gin.Context) {
 }
 
 func (h *AdminMovieHandler) SetStatus(c *gin.Context) {
-	adminID, ok := adminIDFrom(c)
+	scope, ok := adminScopeFrom(c)
 	if !ok {
 		resp.Fail(c, http.StatusUnauthorized, "missing admin")
 		return
@@ -116,7 +116,7 @@ func (h *AdminMovieHandler) SetStatus(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, "invalid status")
 		return
 	}
-	if err := h.movies.SetStatus(c.Request.Context(), adminID, movieID, status); err != nil {
+	if err := h.movies.SetStatus(c.Request.Context(), scope.AdminID, movieID, status); err != nil {
 		resp.Error(c, err)
 		return
 	}

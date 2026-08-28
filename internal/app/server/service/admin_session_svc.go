@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
 	"github.com/NeverENG/CinemaBookingApp/internal/core/port"
+	"github.com/NeverENG/CinemaBookingApp/internal/pkg/uid"
 )
 
 const sessionChangeLockMinutes = 30
@@ -19,6 +21,8 @@ type AdminSessionSvc struct {
 	locks    port.SeatLockRepo
 	orders   port.OrderRepo
 	coupons  port.UserCouponRepo
+	refunds  port.RefundRepo
+	payments port.PaymentRepo
 	logs     port.OperationLogRepo
 }
 
@@ -29,6 +33,8 @@ func NewAdminSessionSvc(
 	locks port.SeatLockRepo,
 	orders port.OrderRepo,
 	coupons port.UserCouponRepo,
+	refunds port.RefundRepo,
+	payments port.PaymentRepo,
 	logs port.OperationLogRepo,
 ) *AdminSessionSvc {
 	return &AdminSessionSvc{
@@ -38,6 +44,8 @@ func NewAdminSessionSvc(
 		locks:    locks,
 		orders:   orders,
 		coupons:  coupons,
+		refunds:  refunds,
+		payments: payments,
 		logs:     logs,
 	}
 }
@@ -52,7 +60,10 @@ type SessionInput struct {
 	PriceRulesJSON string
 }
 
-func (s *AdminSessionSvc) Create(ctx context.Context, adminID int64, in SessionInput) (*domain.ShowSession, error) {
+func (s *AdminSessionSvc) Create(ctx context.Context, scope domain.AdminScope, in SessionInput) (*domain.ShowSession, error) {
+	if scope.IsCinemaAdmin() && (scope.CinemaID == nil || *scope.CinemaID != in.CinemaID) {
+		return nil, domain.ErrForbidden
+	}
 	if in.HallID <= 0 || in.MovieID <= 0 || in.BasePriceCents <= 0 ||
 		!in.EndTime.After(in.StartTime) {
 		return nil, domain.ErrSessionInvalid
@@ -88,14 +99,17 @@ func (s *AdminSessionSvc) Create(ctx context.Context, adminID int64, in SessionI
 	if err := s.sessions.Create(ctx, session); err != nil {
 		return nil, err
 	}
-	return session, s.log(ctx, adminID, "CREATE_SESSION", "session", strconv.FormatInt(session.ID, 10), session)
+	return session, s.log(ctx, scope.AdminID, "CREATE_SESSION", "session", strconv.FormatInt(session.ID, 10), session)
 }
 
 // UpdatePrice 开场前 30 分钟锁定改价。
-func (s *AdminSessionSvc) UpdatePrice(ctx context.Context, adminID, sessionID int64, basePriceCents int64, priceRulesJSON string) error {
+func (s *AdminSessionSvc) UpdatePrice(ctx context.Context, scope domain.AdminScope, sessionID int64, basePriceCents int64, priceRulesJSON string) error {
 	session, err := s.sessions.GetSessionByID(ctx, sessionID)
 	if err != nil {
 		return err
+	}
+	if scope.IsCinemaAdmin() && (scope.CinemaID == nil || *scope.CinemaID != session.CinemaID) {
+		return domain.ErrForbidden
 	}
 	if !s.canChange(session) {
 		return domain.ErrSessionLockedForChange
@@ -106,17 +120,20 @@ func (s *AdminSessionSvc) UpdatePrice(ctx context.Context, adminID, sessionID in
 	if err := s.sessions.UpdatePrice(ctx, sessionID, basePriceCents, priceRulesJSON); err != nil {
 		return err
 	}
-	return s.log(ctx, adminID, "UPDATE_SESSION_PRICE", "session", strconv.FormatInt(sessionID, 10), map[string]any{
+	return s.log(ctx, scope.AdminID, "UPDATE_SESSION_PRICE", "session", strconv.FormatInt(sessionID, 10), map[string]any{
 		"base_price_cents": basePriceCents,
 		"price_rules":      priceRulesJSON,
 	})
 }
 
 // Cancel 取消场次：释放锁、过期待支付订单、解锁优惠券。
-func (s *AdminSessionSvc) Cancel(ctx context.Context, adminID, sessionID int64) error {
+func (s *AdminSessionSvc) Cancel(ctx context.Context, scope domain.AdminScope, sessionID int64) error {
 	session, err := s.sessions.GetSessionByID(ctx, sessionID)
 	if err != nil {
 		return err
+	}
+	if scope.IsCinemaAdmin() && (scope.CinemaID == nil || *scope.CinemaID != session.CinemaID) {
+		return domain.ErrForbidden
 	}
 	if !s.canChange(session) {
 		return domain.ErrSessionLockedForChange
@@ -136,7 +153,62 @@ func (s *AdminSessionSvc) Cancel(ctx context.Context, adminID, sessionID int64) 
 			return err
 		}
 	}
-	return s.log(ctx, adminID, "CANCEL_SESSION", "session", strconv.FormatInt(sessionID, 10), nil)
+
+	// 已支付订单自动退款（整单，Mock 即时成功）
+	paidOrders, err := s.orders.ListPaidBySessionID(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	for _, order := range paidOrders {
+		if err := s.refundOrder(ctx, order); err != nil {
+			return err
+		}
+	}
+	return s.log(ctx, scope.AdminID, "CANCEL_SESSION", "session", strconv.FormatInt(sessionID, 10), nil)
+}
+
+func (s *AdminSessionSvc) refundOrder(ctx context.Context, order domain.Order) error {
+	refund := &domain.Refund{
+		RefundNo:         uid.RefundNo(),
+		OrderNo:          order.OrderNo,
+		UserID:           order.UserID,
+		AmountCents:      order.PaidCents,
+		Reason:           "session_canceled",
+		Status:           domain.RefundSuccess,
+		ExternalRefundNo: uid.RefundNo(),
+	}
+	if err := s.refunds.Create(ctx, refund); err != nil {
+		return err
+	}
+
+	// 订单 PAID -> REFUNDING -> REFUNDED（乐观锁版本递增）
+	if err := order.Transition(domain.OrderEventApplyRefund); err != nil {
+		return err
+	}
+	if err := s.orders.Transition(ctx, order.OrderNo, domain.OrderPaid, domain.OrderRefunding, order.Version); err != nil {
+		return err
+	}
+	if err := order.Transition(domain.OrderEventRefundSuccess); err != nil {
+		return err
+	}
+	if err := s.orders.Transition(ctx, order.OrderNo, domain.OrderRefunding, domain.OrderRefunded, order.Version+1); err != nil {
+		return err
+	}
+
+	// 支付交易 SUCCESS -> REFUNDED
+	payment, err := s.payments.GetByOrderNo(ctx, order.OrderNo)
+	if err != nil && !errors.Is(err, domain.ErrPaymentNotFound) {
+		return err
+	}
+	if err == nil && payment.Status == domain.PaymentSuccess {
+		if err := payment.Transition(domain.PaymentEventRefunded); err != nil {
+			return err
+		}
+		if err := s.payments.Transition(ctx, payment.TransactionNo, domain.PaymentSuccess, domain.PaymentRefunded, payment.Version); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // canChange 场次未开场且未结束/取消时允许修改（预留 30 分钟锁定期）。

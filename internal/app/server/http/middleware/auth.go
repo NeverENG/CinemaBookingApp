@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	CtxUserID = "auth.user_id"
-	CtxRole   = "auth.role"
+	CtxUserID   = "auth.user_id"
+	CtxRole     = "auth.role"
+	CtxCinemaID = "auth.cinema_id"
 )
 
 // AuthMiddleware JWT 鉴权：用户端与管理员端共用解析，角色由调用方限定。
@@ -32,6 +33,9 @@ func (m *AuthMiddleware) User() gin.HandlerFunc {
 		}
 		c.Set(CtxUserID, claims.UserID)
 		c.Set(CtxRole, claims.Role)
+		if claims.CinemaID != nil {
+			c.Set(CtxCinemaID, *claims.CinemaID)
+		}
 		c.Next()
 	}
 }
@@ -50,6 +54,9 @@ func (m *AuthMiddleware) Admin(roles ...string) gin.HandlerFunc {
 		}
 		c.Set(CtxUserID, claims.UserID)
 		c.Set(CtxRole, claims.Role)
+		if claims.CinemaID != nil {
+			c.Set(CtxCinemaID, *claims.CinemaID)
+		}
 		c.Next()
 	}
 }

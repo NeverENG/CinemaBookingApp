@@ -19,7 +19,7 @@ func main() {
 	}
 
 	if *migrate {
-		if err := postgres.ApplyMigrations(app.DB, "sql/migrations/migrations001.sql"); err != nil {
+		if err := postgres.ApplyAllMigrations(app.DB, "sql/migrations"); err != nil {
 			log.Fatalf("migrate: %v", err)
 		}
 		log.Println("migrations applied")

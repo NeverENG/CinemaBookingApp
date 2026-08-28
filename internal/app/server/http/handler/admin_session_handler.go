@@ -30,7 +30,7 @@ type sessionRequest struct {
 }
 
 func (h *AdminSessionHandler) Create(c *gin.Context) {
-	adminID, ok := adminIDFrom(c)
+	scope, ok := adminScopeFrom(c)
 	if !ok {
 		resp.Fail(c, http.StatusUnauthorized, "missing admin")
 		return
@@ -45,7 +45,7 @@ func (h *AdminSessionHandler) Create(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	session, err := h.sessions.Create(c.Request.Context(), adminID, in)
+	session, err := h.sessions.Create(c.Request.Context(), scope, in)
 	if err != nil {
 		resp.Error(c, err)
 		return
@@ -54,7 +54,7 @@ func (h *AdminSessionHandler) Create(c *gin.Context) {
 }
 
 func (h *AdminSessionHandler) UpdatePrice(c *gin.Context) {
-	adminID, ok := adminIDFrom(c)
+	scope, ok := adminScopeFrom(c)
 	if !ok {
 		resp.Fail(c, http.StatusUnauthorized, "missing admin")
 		return
@@ -72,7 +72,7 @@ func (h *AdminSessionHandler) UpdatePrice(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := h.sessions.UpdatePrice(c.Request.Context(), adminID, sessionID, req.BasePriceCents, req.PriceRules); err != nil {
+	if err := h.sessions.UpdatePrice(c.Request.Context(), scope, sessionID, req.BasePriceCents, req.PriceRules); err != nil {
 		resp.Error(c, err)
 		return
 	}
@@ -80,7 +80,7 @@ func (h *AdminSessionHandler) UpdatePrice(c *gin.Context) {
 }
 
 func (h *AdminSessionHandler) Cancel(c *gin.Context) {
-	adminID, ok := adminIDFrom(c)
+	scope, ok := adminScopeFrom(c)
 	if !ok {
 		resp.Fail(c, http.StatusUnauthorized, "missing admin")
 		return
@@ -90,7 +90,7 @@ func (h *AdminSessionHandler) Cancel(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, "invalid session id")
 		return
 	}
-	if err := h.sessions.Cancel(c.Request.Context(), adminID, sessionID); err != nil {
+	if err := h.sessions.Cancel(c.Request.Context(), scope, sessionID); err != nil {
 		resp.Error(c, err)
 		return
 	}

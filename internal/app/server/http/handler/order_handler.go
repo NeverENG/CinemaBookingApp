@@ -1,0 +1,74 @@
+package handler
+
+import (
+	"net/http"
+
+	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/middleware"
+	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/resp"
+	"github.com/NeverENG/CinemaBookingApp/internal/app/server/service"
+	"github.com/gin-gonic/gin"
+)
+
+// OrderHandler 订单 HTTP 层：只做参数绑定、鉴权、错误映射。
+type OrderHandler struct {
+	orders *service.OrderSvc
+}
+
+func NewOrderHandler(orders *service.OrderSvc) *OrderHandler {
+	return &OrderHandler{orders: orders}
+}
+
+type createOrderRequest struct {
+	SessionID int64   `json:"session_id" binding:"required"`
+	SeatIDs   []int64 `json:"seat_ids" binding:"required,min=1"`
+	CouponNo  string  `json:"coupon_no"`
+}
+
+type createOrderResponse struct {
+	OrderNo   string   `json:"order_no"`
+	ExpireAt  string   `json:"expire_at"`
+	PaidCents int64    `json:"paid_cents"`
+	SeatNos   []string `json:"seat_nos"`
+}
+
+// Create POST /api/v1/orders
+func (h *OrderHandler) Create(c *gin.Context) {
+	userIDAny, exists := c.Get(middleware.CtxUserID)
+	if !exists {
+		resp.Fail(c, http.StatusUnauthorized, "missing user")
+		return
+	}
+	userID, ok := userIDAny.(int64)
+	if !ok || userID <= 0 {
+		resp.Fail(c, http.StatusUnauthorized, "invalid user")
+		return
+	}
+
+	var req createOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	order, err := h.orders.CreateOrder(c.Request.Context(), service.CreateOrderInput{
+		UserID:    userID,
+		SessionID: req.SessionID,
+		SeatIDs:   req.SeatIDs,
+		CouponNo:  req.CouponNo,
+	})
+	if err != nil {
+		resp.Error(c, err)
+		return
+	}
+
+	seatNos := make([]string, 0, len(order.Items))
+	for _, item := range order.Items {
+		seatNos = append(seatNos, item.SeatNo)
+	}
+	resp.OK(c, createOrderResponse{
+		OrderNo:   order.OrderNo,
+		ExpireAt:  order.ExpireAt.Format("2006-01-02 15:04:05"),
+		PaidCents: order.PaidCents,
+		SeatNos:   seatNos,
+	})
+}

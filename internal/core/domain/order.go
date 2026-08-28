@@ -1,56 +1,82 @@
 package domain
 
-import (
-	"errors"
-	"time"
-)
+import "time"
 
 type OrderStatus string
 
 const (
-	OrderPayPending      OrderStatus = "PENDING_PAYMENT"
-	OrderPaid            OrderStatus = "PAID"
-	OrderCompleted       OrderStatus = "COMPLETED"
-	OrderFail            OrderStatus = "FAIL"
-	OrderCanceled        OrderStatus = "CANCELED"
-	OrderExpire          OrderStatus = "EXPIRE"
-	OrderRefund          OrderStatus = "REFUNDING"
-	OrderRefundCompleted OrderStatus = "ReFUNDED"
+	OrderPendingPayment OrderStatus = "PENDING_PAYMENT"
+	OrderPaid           OrderStatus = "PAID"
+	OrderCompleted      OrderStatus = "COMPLETED"
+	OrderCanceled       OrderStatus = "CANCELED"
+	OrderExpired        OrderStatus = "EXPIRED"
+	OrderRefunding      OrderStatus = "REFUNDING"
+	OrderRefunded       OrderStatus = "REFUNDED"
 )
 
-var ErrInvalidTransition = errors.New("invalid order status transition")
-var ErrMoneyInvalid = errors.New("invalid money")
+type OrderEvent string
 
-var allowedTransitions = map[OrderStatus]map[OrderStatus]bool{
-	OrderPayPending: {OrderPaid: true, OrderExpire: true, OrderCanceled: true},
-	OrderPaid:       {OrderCompleted: true, OrderFail: true},
-	OrderCompleted:  {OrderRefund: true},
-	OrderRefund:     {OrderRefundCompleted: true},
+const (
+	OrderEventPaySuccess    OrderEvent = "PAY_SUCCESS"
+	OrderEventUserCancel    OrderEvent = "USER_CANCEL"
+	OrderEventTimeout       OrderEvent = "TIMEOUT"
+	OrderEventComplete      OrderEvent = "COMPLETE"
+	OrderEventApplyRefund   OrderEvent = "APPLY_REFUND"
+	OrderEventRefundSuccess OrderEvent = "REFUND_SUCCESS"
+	OrderEventRefundFail    OrderEvent = "REFUND_FAIL"
+)
+
+var orderTransitions = map[OrderStatus]map[OrderEvent]OrderStatus{
+	OrderPendingPayment: {
+		OrderEventPaySuccess: OrderPaid,
+		OrderEventUserCancel: OrderCanceled,
+		OrderEventTimeout:    OrderExpired,
+	},
+	OrderPaid: {
+		OrderEventComplete:    OrderCompleted,
+		OrderEventApplyRefund: OrderRefunding,
+	},
+	OrderRefunding: {
+		OrderEventRefundSuccess: OrderRefunded,
+		OrderEventRefundFail:    OrderPaid,
+	},
 }
 
-func (s OrderStatus) CanTransition(to OrderStatus) bool {
-	return allowedTransitions[s][to]
+func (s OrderStatus) CanTransition(event OrderEvent) bool {
+	_, ok := orderTransitions[s][event]
+	return ok
 }
 
 type Order struct {
-	OrderNo       string
-	UserID        int64
-	SessionID     int64
-	Status        OrderStatus
-	TotalCents    int64
-	DiscountCents int64
-	CouponCents   int64
-	PaidCents     int64
-	ExpireAt      time.Time
-	Version       int32
+	OrderNo          string
+	UserID           int64
+	SessionID        int64
+	CinemaID         int64
+	MovieID          int64
+	Status           OrderStatus
+	TotalCents       int64
+	DiscountCents    int64
+	CouponCents      int64
+	PaidCents        int64
+	CouponInstanceID *int64
+	ExpireAt         time.Time
+	Version          int32
+	Items            []OrderItem
+	CreatedAt        time.Time
+	PaidAt           *time.Time
 }
 
-func (o *Order) CanMarkPaid() bool {
-	return o.Status.CanTransition(OrderPaid)
+func (o *Order) Transition(event OrderEvent) error {
+	next, ok := orderTransitions[o.Status][event]
+	if !ok {
+		return ErrInvalidTransition
+	}
+	o.Status = next
+	return nil
 }
 
 func (o *Order) IsExpired(now time.Time) bool {
-	return o.Status == OrderPayPending && now.After(o.ExpireAt)
+	return o.Status == OrderPendingPayment && now.After(o.ExpireAt)
 }
 
 func (o *Order) Settle(total, discount, coupon int64) error {

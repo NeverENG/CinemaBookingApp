@@ -1,0 +1,185 @@
+package service
+
+import (
+	"context"
+	"time"
+
+	"github.com/NeverENG/CinemaBookingApp/internal/app/server/biz"
+	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
+	"github.com/NeverENG/CinemaBookingApp/internal/core/port"
+	"github.com/NeverENG/CinemaBookingApp/internal/pkg/uid"
+)
+
+const (
+	orderTTL          = 15 * time.Minute
+	seatStatusEnabled = "ENABLED"
+)
+
+// OrderSvc 下单用例编排。
+// TODO(你): 按 docs/FSD/F0000 与状态机实现 CreateOrder：
+//
+//	tx.Run → 校验用户/场次/座位 → CreateLocks（DB 唯一索引兜底）
+//	→ biz.CalcOrderAmount → orders.CreateOrder(PENDING_PAYMENT)
+//	→ 用券则 coupons.LockForOrder → 返回订单
+type OrderSvc struct {
+	tx       port.TxManager
+	users    port.UserRepo
+	sessions port.SessionRepo
+	seats    port.SeatRepo
+	locks    port.SeatLockRepo
+	coupons  port.UserCouponRepo
+	orders   port.OrderRepo
+}
+
+func NewOrderSvc(
+	tx port.TxManager,
+	users port.UserRepo,
+	sessions port.SessionRepo,
+	seats port.SeatRepo,
+	locks port.SeatLockRepo,
+	coupons port.UserCouponRepo,
+	orders port.OrderRepo,
+) *OrderSvc {
+	return &OrderSvc{
+		tx:       tx,
+		users:    users,
+		sessions: sessions,
+		seats:    seats,
+		locks:    locks,
+		coupons:  coupons,
+		orders:   orders,
+	}
+}
+
+type CreateOrderInput struct {
+	UserID    int64
+	SessionID int64
+	SeatIDs   []int64
+	CouponNo  string // 可空：不用券
+}
+
+func (s *OrderSvc) CreateOrder(ctx context.Context, in CreateOrderInput) (*domain.Order, error) {
+	if len(in.SeatIDs) == 0 {
+		return nil, domain.ErrSeatNotAvailable
+	}
+
+	var order *domain.Order
+	err := s.tx.Run(ctx, func(txCtx context.Context) error {
+		if _, err := s.users.GetUserByID(txCtx, in.UserID); err != nil {
+			return err
+		}
+
+		session, err := s.sessions.GetSessionByID(txCtx, in.SessionID)
+		if err != nil {
+			return err
+		}
+		if !session.CanBook(time.Now()) {
+			return domain.ErrSessionNotBookable
+		}
+
+		seats, err := s.seats.ListSeatsByIDs(txCtx, in.SeatIDs)
+		if err != nil {
+			return err
+		}
+		if len(seats) != len(in.SeatIDs) {
+			return domain.ErrSeatNotAvailable
+		}
+		prices := make([]int64, 0, len(seats))
+		for _, seat := range seats {
+			if seat.HallID != session.HallID || seat.Status != seatStatusEnabled {
+				return domain.ErrSeatNotAvailable
+			}
+			prices = append(prices, session.BasePriceCents)
+		}
+
+		couponDiscount := int64(0)
+		var coupon *domain.UserCoupon
+		if in.CouponNo != "" {
+			coupon, err = s.coupons.GetByCouponNo(txCtx, in.CouponNo)
+			if err != nil {
+				return err
+			}
+			if coupon.UserID != in.UserID || coupon.Status != domain.CouponUnused || time.Now().After(coupon.ExpireAt) {
+				return domain.ErrCouponNotAvailable
+			}
+			template, err := s.coupons.GetTemplateByID(txCtx, coupon.TemplateID)
+			if err != nil {
+				return err
+			}
+			total, _, _, _, err := biz.CalcOrderAmount(prices, 0)
+			if err != nil {
+				return err
+			}
+			couponDiscount, err = template.DiscountCents(total)
+			if err != nil {
+				return err
+			}
+		}
+
+		total, discount, couponAmt, _, err := biz.CalcOrderAmount(prices, couponDiscount)
+		if err != nil {
+			return err
+		}
+
+		now := time.Now()
+		order = &domain.Order{
+			OrderNo:   uid.OrderNo(),
+			UserID:    in.UserID,
+			SessionID: in.SessionID,
+			CinemaID:  session.CinemaID,
+			MovieID:   session.MovieID,
+			Status:    domain.OrderPendingPayment,
+			ExpireAt:  now.Add(orderTTL),
+			Version:   1,
+			CreatedAt: now,
+		}
+		if err := order.Settle(total, discount, couponAmt); err != nil {
+			return err
+		}
+
+		items := make([]domain.OrderItem, 0, len(seats))
+		for i, seat := range seats {
+			items = append(items, domain.OrderItem{
+				OrderNo:    order.OrderNo,
+				SessionID:  session.ID,
+				SeatID:     seat.ID,
+				SeatNo:     seat.SeatNo,
+				PriceCents: prices[i],
+			})
+		}
+		order.Items = items
+
+		if err := s.orders.CreateOrder(txCtx, order); err != nil {
+			return err
+		}
+
+		locks := make([]domain.SeatLock, 0, len(seats))
+		for _, seat := range seats {
+			locks = append(locks, domain.SeatLock{
+				SessionID: session.ID,
+				SeatID:    seat.ID,
+				UserID:    in.UserID,
+				OrderNo:   order.OrderNo,
+				LockToken: uid.LockToken(),
+				Status:    domain.SeatLockLocked,
+				ExpiresAt: order.ExpireAt,
+			})
+		}
+		if err := s.locks.CreateLocks(txCtx, locks); err != nil {
+			return err
+		}
+
+		if coupon != nil {
+			if err := s.coupons.LockForOrder(txCtx, coupon.CouponNo, order.OrderNo); err != nil {
+				return err
+			}
+			couponID := coupon.ID
+			order.CouponInstanceID = &couponID
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return order, nil
+}

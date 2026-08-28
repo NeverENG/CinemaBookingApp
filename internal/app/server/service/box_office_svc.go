@@ -60,6 +60,18 @@ func (s *BoxOfficeSvc) ByCinema(ctx context.Context, scope domain.AdminScope, q 
 	})
 }
 
+func (s *BoxOfficeSvc) Summary(ctx context.Context, scope domain.AdminScope, q DashboardQuery) (*domain.BoxOfficeSummary, error) {
+	if err := applyBoxScope(&q, scope); err != nil {
+		return nil, err
+	}
+	return s.box.Summary(ctx, port.BoxOfficeFilter{
+		StartDate: q.StartDate,
+		EndDate:   q.EndDate,
+		CinemaID:  q.CinemaID,
+		MovieID:   q.MovieID,
+	})
+}
+
 func (s *BoxOfficeSvc) Reconcile(ctx context.Context) error {
 	return s.box.Rebuild(ctx)
 }

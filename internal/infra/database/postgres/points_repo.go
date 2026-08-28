@@ -117,7 +117,7 @@ func (r *PointsRepo) apply(ctx context.Context, userID int64, change int, bizTyp
 		CreatedAt:    time.Now(),
 	}
 	if err := db.Create(&row).Error; err != nil {
-		if errors.Is(err, gorm.ErrDuplicatedKey) {
+		if errors.Is(err, gorm.ErrDuplicatedKey) || isUniqueViolation(err) {
 			return nil // 已记账，幂等成功
 		}
 		return err
@@ -162,4 +162,14 @@ func (r *PointsRepo) GetRecentLedger(ctx context.Context, userID int64, limit in
 		})
 	}
 	return ledger, nil
+}
+
+func (r *PointsRepo) ListBalanceMismatches(ctx context.Context) ([]int64, error) {
+	var ids []int64
+	err := r.db.db(ctx).Raw(`
+		SELECT u.id FROM users u
+		WHERE u.points_balance <> COALESCE(
+		    (SELECT SUM(change_points) FROM points_ledger l WHERE l.user_id = u.id), 0
+		)`).Scan(&ids).Error
+	return ids, err
 }

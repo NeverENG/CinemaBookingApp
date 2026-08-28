@@ -45,3 +45,26 @@ func (t *CouponTemplate) DiscountCents(totalCents int64) (int64, error) {
 	}
 	return d, nil
 }
+
+// Validate 模板校验。
+func (t *CouponTemplate) Validate() error {
+	if t.Name == "" || t.Type == "" {
+		return ErrCouponNotAvailable
+	}
+	switch t.Type {
+	case CouponTypeFixed:
+		if t.ValueCents <= 0 {
+			return ErrCouponNotAvailable
+		}
+	case CouponTypePercent:
+		if t.PercentBp <= 0 || t.PercentBp > 10000 {
+			return ErrCouponNotAvailable
+		}
+	default:
+		return ErrCouponNotAvailable
+	}
+	if t.MinSpendCents < 0 || t.TotalQty < 0 || t.PerUserLimit <= 0 || t.RedeemPoints < 0 {
+		return ErrCouponNotAvailable
+	}
+	return nil
+}

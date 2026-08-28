@@ -97,6 +97,47 @@ func (r *UserCouponRepo) GetTemplateByID(ctx context.Context, templateID int64) 
 	}, nil
 }
 
+func (r *UserCouponRepo) CreateTemplate(ctx context.Context, template *domain.CouponTemplate) error {
+	row := &couponTemplateRow{
+		Name:             template.Name,
+		Type:             template.Type,
+		ValueCents:       template.ValueCents,
+		PercentBp:        template.PercentBp,
+		MinSpendCents:    template.MinSpendCents,
+		MaxDiscountCents: template.MaxDiscountCents,
+		Redeemable:       template.Redeemable,
+		RedeemPoints:     template.RedeemPoints,
+		ValidDays:        template.ValidDays,
+		TotalQty:         template.TotalQty,
+		PerUserLimit:     template.PerUserLimit,
+		Status:           template.Status,
+	}
+	if err := r.db.db(ctx).Create(row).Error; err != nil {
+		return err
+	}
+	template.ID = row.ID
+	return nil
+}
+
+func (r *UserCouponRepo) ListTemplates(ctx context.Context) ([]domain.CouponTemplate, error) {
+	var rows []couponTemplateRow
+	if err := r.db.db(ctx).Order("id").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	templates := make([]domain.CouponTemplate, 0, len(rows))
+	for _, row := range rows {
+		templates = append(templates, toCouponTemplate(row))
+	}
+	return templates, nil
+}
+
+func (r *UserCouponRepo) SetTemplateStatus(ctx context.Context, templateID int64, status string) error {
+	return r.db.db(ctx).
+		Model(&couponTemplateRow{}).
+		Where("id = ?", templateID).
+		Update("status", status).Error
+}
+
 func (r *UserCouponRepo) ListRedeemableTemplates(ctx context.Context) ([]domain.CouponTemplate, error) {
 	var rows []couponTemplateRow
 	if err := r.db.db(ctx).
@@ -107,23 +148,27 @@ func (r *UserCouponRepo) ListRedeemableTemplates(ctx context.Context) ([]domain.
 	}
 	templates := make([]domain.CouponTemplate, 0, len(rows))
 	for _, row := range rows {
-		templates = append(templates, domain.CouponTemplate{
-			ID:               row.ID,
-			Name:             row.Name,
-			Type:             row.Type,
-			ValueCents:       row.ValueCents,
-			PercentBp:        row.PercentBp,
-			MinSpendCents:    row.MinSpendCents,
-			MaxDiscountCents: row.MaxDiscountCents,
-			Redeemable:       row.Redeemable,
-			RedeemPoints:     row.RedeemPoints,
-			ValidDays:        row.ValidDays,
-			TotalQty:         row.TotalQty,
-			PerUserLimit:     row.PerUserLimit,
-			Status:           row.Status,
-		})
+		templates = append(templates, toCouponTemplate(row))
 	}
 	return templates, nil
+}
+
+func toCouponTemplate(row couponTemplateRow) domain.CouponTemplate {
+	return domain.CouponTemplate{
+		ID:               row.ID,
+		Name:             row.Name,
+		Type:             row.Type,
+		ValueCents:       row.ValueCents,
+		PercentBp:        row.PercentBp,
+		MinSpendCents:    row.MinSpendCents,
+		MaxDiscountCents: row.MaxDiscountCents,
+		Redeemable:       row.Redeemable,
+		RedeemPoints:     row.RedeemPoints,
+		ValidDays:        row.ValidDays,
+		TotalQty:         row.TotalQty,
+		PerUserLimit:     row.PerUserLimit,
+		Status:           row.Status,
+	}
 }
 
 func (r *UserCouponRepo) CreateInstance(ctx context.Context, coupon *domain.UserCoupon) error {

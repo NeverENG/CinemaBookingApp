@@ -22,6 +22,7 @@ type BoxOfficeRepo interface {
 	Trend(ctx context.Context, filter BoxOfficeFilter, granularity string) ([]domain.BoxOfficeTrendRow, error)
 	ByMovie(ctx context.Context, filter BoxOfficeFilter) ([]domain.BoxOfficeMovieRow, error)
 	ByCinema(ctx context.Context, filter BoxOfficeFilter) ([]domain.BoxOfficeCinemaRow, error)
+	Summary(ctx context.Context, filter BoxOfficeFilter) (*domain.BoxOfficeSummary, error)
 	// Rebuild 对账：由 ledger 全量重建 daily。
 	Rebuild(ctx context.Context) error
 }

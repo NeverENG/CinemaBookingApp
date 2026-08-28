@@ -84,3 +84,8 @@ func (s *PointsSvc) Exchange(ctx context.Context, userID int64, templateID int64
 func (s *PointsSvc) ListRedeemable(ctx context.Context) ([]domain.CouponTemplate, error) {
 	return s.coupons.ListRedeemableTemplates(ctx)
 }
+
+// Reconcile 返回积分余额与流水不一致的用户（对账任务调用，只读）。
+func (s *PointsSvc) Reconcile(ctx context.Context) ([]int64, error) {
+	return s.points.ListBalanceMismatches(ctx)
+}

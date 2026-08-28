@@ -54,6 +54,7 @@ func (f *fakeUserRepo) UpdatePassword(ctx context.Context, userID int64, passwor
 
 type fakeSessionRepo struct {
 	sessions map[int64]*domain.ShowSession
+	recalc   []int64
 }
 
 func (f *fakeSessionRepo) GetSessionByID(ctx context.Context, id int64) (*domain.ShowSession, error) {
@@ -110,6 +111,11 @@ func (f *fakeSessionRepo) ListByFilter(ctx context.Context, movieID, cinemaID in
 		}
 	}
 	return out, nil
+}
+
+func (f *fakeSessionRepo) RecalcStatus(ctx context.Context, sessionID int64) error {
+	f.recalc = append(f.recalc, sessionID)
+	return nil
 }
 
 type fakeSeatRepo struct {
@@ -212,6 +218,31 @@ func (f *fakeCouponRepo) GetTemplateByID(ctx context.Context, templateID int64) 
 		return t, nil
 	}
 	return nil, domain.ErrCouponNotAvailable
+}
+
+func (f *fakeCouponRepo) CreateTemplate(ctx context.Context, template *domain.CouponTemplate) error {
+	if f.templates == nil {
+		f.templates = make(map[int64]*domain.CouponTemplate)
+	}
+	template.ID = int64(len(f.templates) + 1)
+	f.templates[template.ID] = template
+	return nil
+}
+
+func (f *fakeCouponRepo) ListTemplates(ctx context.Context) ([]domain.CouponTemplate, error) {
+	out := make([]domain.CouponTemplate, 0, len(f.templates))
+	for _, t := range f.templates {
+		out = append(out, *t)
+	}
+	return out, nil
+}
+
+func (f *fakeCouponRepo) SetTemplateStatus(ctx context.Context, templateID int64, status string) error {
+	if t, ok := f.templates[templateID]; ok {
+		t.Status = status
+		return nil
+	}
+	return domain.ErrCouponNotAvailable
 }
 
 func (f *fakeCouponRepo) ListRedeemableTemplates(ctx context.Context) ([]domain.CouponTemplate, error) {

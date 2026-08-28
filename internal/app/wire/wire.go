@@ -100,6 +100,7 @@ func NewApp(cfg config.Config) (*App, error) {
 	refundSvc := service.NewRefundSvc(txm, orderRepo, refundRepo, paymentRepo, seatLockRepo, pointsRepo, sessionRepo, boxOfficeRepo)
 	boxOfficeSvc := service.NewBoxOfficeSvc(boxOfficeRepo)
 	changeSvc := service.NewChangeTicketSvc(orderRepo, sessionRepo, orderSvc, paymentSvc, refundSvc)
+	couponSvc := service.NewAdminCouponSvc(txm, couponRepo, userRepo, operationLogRepo)
 
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
@@ -115,9 +116,10 @@ func NewApp(cfg config.Config) (*App, error) {
 	dashboardHandler := handler.NewDashboardHandler(boxOfficeSvc)
 	changeHandler := handler.NewChangeHandler(changeSvc)
 	healthHandler := handler.NewHealthHandler(db)
+	couponHandler := handler.NewAdminCouponHandler(couponSvc)
 	authMw := middleware.NewAuthMiddleware(tokens)
 
-	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler, refundHandler, dashboardHandler, changeHandler, healthHandler)
+	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler, refundHandler, dashboardHandler, changeHandler, healthHandler, couponHandler)
 
 	runner := job.NewRunner()
 	runner.Add("order_timeout", func(ctx context.Context) error {
@@ -134,6 +136,26 @@ func NewApp(cfg config.Config) (*App, error) {
 	})
 	runner.Add("box_office_reconcile", func(ctx context.Context) error {
 		return boxOfficeSvc.Reconcile(ctx)
+	})
+	runner.Add("reconcile_orders", func(ctx context.Context) error {
+		items, err := paymentSvc.Reconcile(ctx)
+		if err != nil {
+			return err
+		}
+		for _, item := range items {
+			log.Printf("reconcile mismatch: %s", item)
+		}
+		return nil
+	})
+	runner.Add("reconcile_points", func(ctx context.Context) error {
+		ids, err := pointsSvc.Reconcile(ctx)
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			log.Printf("points mismatch user: %d", id)
+		}
+		return nil
 	})
 
 	return &App{Engine: engine, DB: db, Addr: cfg.HTTPAddr, Jobs: runner}, nil

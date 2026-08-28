@@ -79,6 +79,26 @@ func (h *DashboardHandler) ByCinema(c *gin.Context) {
 	resp.OK(c, rows)
 }
 
+// Summary GET /api/v1/admin/dashboard/box-office/summary
+func (h *DashboardHandler) Summary(c *gin.Context) {
+	scope, ok := adminScopeFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "missing admin")
+		return
+	}
+	q, err := parseDashboardQuery(c)
+	if err != nil {
+		resp.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	s, err := h.box.Summary(c.Request.Context(), scope, q)
+	if err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, s)
+}
+
 // Reconcile POST /api/v1/dashboard/box-office/reconcile（由 ledger 重建聚合）
 func (h *DashboardHandler) Reconcile(c *gin.Context) {
 	if err := h.box.Reconcile(c.Request.Context()); err != nil {

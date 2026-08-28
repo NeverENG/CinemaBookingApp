@@ -146,6 +146,9 @@ func (s *RefundSvc) HandleMockCallback(ctx context.Context, refundNo string) err
 		if err := s.locks.ReleaseByOrderNo(txCtx, refund.OrderNo, domain.SeatLockReleased); err != nil {
 			return err
 		}
+		if err := s.sessions.RecalcStatus(txCtx, order.SessionID); err != nil {
+			return err
+		}
 		if err := s.points.ReclaimOnRefund(txCtx, refund.UserID, refund.AmountCents, refund.RefundNo); err != nil {
 			return err
 		}

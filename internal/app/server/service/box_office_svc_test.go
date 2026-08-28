@@ -35,6 +35,11 @@ func (f *fakeBoxOfficeRepo) ByCinema(ctx context.Context, filter port.BoxOfficeF
 	return nil, nil
 }
 
+func (f *fakeBoxOfficeRepo) Summary(ctx context.Context, filter port.BoxOfficeFilter) (*domain.BoxOfficeSummary, error) {
+	f.lastFilter = filter
+	return &domain.BoxOfficeSummary{OrderCount: 1}, nil
+}
+
 func (f *fakeBoxOfficeRepo) Rebuild(ctx context.Context) error {
 	return nil
 }

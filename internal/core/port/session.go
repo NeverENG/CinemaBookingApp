@@ -14,4 +14,6 @@ type SessionRepo interface {
 	Cancel(ctx context.Context, id int64) error
 	ListOverlapping(ctx context.Context, hallID int64, start, end time.Time) ([]domain.ShowSession, error)
 	ListByFilter(ctx context.Context, movieID, cinemaID int64) ([]domain.ShowSession, error)
+	// RecalcStatus 满座置 SOLD_OUT，有余座回 OPEN（仅 OPEN/SOLD_OUT 之间切换）。
+	RecalcStatus(ctx context.Context, sessionID int64) error
 }

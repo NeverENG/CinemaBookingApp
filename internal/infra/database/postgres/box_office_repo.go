@@ -69,7 +69,7 @@ func (r *BoxOfficeRepo) Record(ctx context.Context, event *domain.BoxOfficeEvent
 		CreatedAt:   time.Now(),
 	}
 	if err := db.Create(&ledger).Error; err != nil {
-		if errors.Is(err, gorm.ErrDuplicatedKey) {
+		if errors.Is(err, gorm.ErrDuplicatedKey) || isUniqueViolation(err) {
 			return nil // 已记录，幂等
 		}
 		return err
@@ -172,6 +172,27 @@ func (r *BoxOfficeRepo) ByCinema(ctx context.Context, filter port.BoxOfficeFilte
 		return nil, err
 	}
 	return rows, nil
+}
+
+func (r *BoxOfficeRepo) Summary(ctx context.Context, filter port.BoxOfficeFilter) (*domain.BoxOfficeSummary, error) {
+	query := `
+		SELECT COALESCE(SUM(order_count), 0)  AS order_count,
+		       COALESCE(SUM(ticket_count), 0) AS ticket_count,
+		       COALESCE(SUM(gross_cents), 0)  AS gross_cents,
+		       COALESCE(SUM(refund_cents), 0) AS refund_cents,
+		       COALESCE(SUM(net_cents), 0)    AS net_cents
+		FROM daily_box_office
+		WHERE stat_date >= ? AND stat_date < ?
+		  AND (? = 0 OR cinema_id = ?) AND (? = 0 OR movie_id = ?)`
+	var s domain.BoxOfficeSummary
+	if err := r.db.db(ctx).Raw(query,
+		filter.StartDate, filter.EndDate,
+		filter.CinemaID, filter.CinemaID,
+		filter.MovieID, filter.MovieID,
+	).Scan(&s).Error; err != nil {
+		return nil, err
+	}
+	return &s, nil
 }
 
 // Rebuild 对账：由 ledger 全量重建 daily。

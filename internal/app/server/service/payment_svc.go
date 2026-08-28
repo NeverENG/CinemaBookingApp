@@ -266,6 +266,11 @@ func (s *PaymentSvc) CloseExpiredPending(ctx context.Context, limit int) (int, e
 	return closed, nil
 }
 
+// Reconcile 返回订单↔支付不一致项（对账任务调用，只读）。
+func (s *PaymentSvc) Reconcile(ctx context.Context) ([]string, error) {
+	return s.payments.ListOrderPaymentMismatches(ctx)
+}
+
 // MockPay 模拟支付页确认：生成回调事件并走完整回调链路（幂等）。
 func (s *PaymentSvc) MockPay(ctx context.Context, userID int64, transactionNo string) error {
 	payment, err := s.payments.GetByTransactionNo(ctx, transactionNo)

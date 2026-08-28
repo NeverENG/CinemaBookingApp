@@ -16,4 +16,6 @@ type PointsRepo interface {
 	Exchange(ctx context.Context, userID int64, points int, exchangeNo string) (int, error)
 	GetBalance(ctx context.Context, userID int64) (int, error)
 	GetRecentLedger(ctx context.Context, userID int64, limit int) ([]domain.PointsLedger, error)
+	// ListBalanceMismatches 余额与流水不一致的用户（对账用）。
+	ListBalanceMismatches(ctx context.Context) ([]int64, error)
 }

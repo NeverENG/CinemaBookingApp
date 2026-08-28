@@ -99,6 +99,34 @@ func (r *PaymentRepo) Transition(ctx context.Context, transactionNo string, from
 	return nil
 }
 
+func (r *PaymentRepo) ListOrderPaymentMismatches(ctx context.Context) ([]string, error) {
+	var items []string
+	rows, err := r.db.db(ctx).Raw(`
+		SELECT 'PAY_WITHOUT_ORDER:' || p.biz_no FROM payment_transactions p
+		LEFT JOIN orders o ON o.order_no = p.biz_no
+		WHERE p.status = 'SUCCESS'
+		  AND (o.order_no IS NULL OR o.status NOT IN ('PAID','REFUNDING','REFUNDED','COMPLETED'))
+		UNION ALL
+		SELECT 'ORDER_WITHOUT_PAY:' || o.order_no FROM orders o
+		WHERE o.status IN ('PAID','REFUNDING','REFUNDED')
+		  AND NOT EXISTS (
+		      SELECT 1 FROM payment_transactions p
+		      WHERE p.biz_no = o.order_no AND p.status IN ('SUCCESS','REFUNDED')
+		  )`).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item string
+		if err := rows.Scan(&item); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 func toPaymentRow(tx *domain.PaymentTransaction) *paymentRow {
 	return &paymentRow{
 		TransactionNo:   tx.TransactionNo,

@@ -14,6 +14,8 @@ type PaymentRepo interface {
 	GetByOrderNo(ctx context.Context, orderNo string) (*domain.PaymentTransaction, error)
 	ListPendingOlderThan(ctx context.Context, before time.Time, limit int) ([]domain.PaymentTransaction, error)
 	Transition(ctx context.Context, transactionNo string, from, to domain.PaymentStatus, version int32) error
+	// ListOrderPaymentMismatches 订单↔支付不一致项（对账用）。
+	ListOrderPaymentMismatches(ctx context.Context) ([]string, error)
 }
 
 // PaymentCallbackRepo 回调记录仓储：event_id 唯一是幂等键。

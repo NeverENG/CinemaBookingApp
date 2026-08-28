@@ -58,6 +58,10 @@ func (f *fakePaymentRepo) Transition(ctx context.Context, transactionNo string, 
 	return nil
 }
 
+func (f *fakePaymentRepo) ListOrderPaymentMismatches(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
 type fakeCallbackRepo struct {
 	callbacks map[string]*domain.PaymentCallback
 }
@@ -143,6 +147,10 @@ func (f *fakePointsRepo) GetBalance(ctx context.Context, userID int64) (int, err
 
 func (f *fakePointsRepo) GetRecentLedger(ctx context.Context, userID int64, limit int) ([]domain.PointsLedger, error) {
 	return f.ledger, nil
+}
+
+func (f *fakePointsRepo) ListBalanceMismatches(ctx context.Context) ([]int64, error) {
+	return nil, nil
 }
 
 func paidOrderFixture() *domain.Order {

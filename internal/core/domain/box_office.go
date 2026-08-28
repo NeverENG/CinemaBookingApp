@@ -82,3 +82,12 @@ type BoxOfficeCinemaRow struct {
 	GrossCents int64
 	NetCents   int64
 }
+
+// BoxOfficeSummary 看板汇总卡。
+type BoxOfficeSummary struct {
+	OrderCount  int   `json:"order_count"`
+	TicketCount int   `json:"ticket_count"`
+	GrossCents  int64 `json:"gross_cents"`
+	RefundCents int64 `json:"refund_cents"`
+	NetCents    int64 `json:"net_cents"`
+}

@@ -151,3 +151,17 @@ func (r *SessionRepo) ListByFilter(ctx context.Context, movieID, cinemaID int64)
 	}
 	return sessions, nil
 }
+
+func (r *SessionRepo) RecalcStatus(ctx context.Context, sessionID int64) error {
+	return r.db.db(ctx).Exec(`
+		UPDATE show_sessions s
+		SET status = CASE
+			WHEN (
+				SELECT count(*) FROM seat_locks l
+				WHERE l.session_id = s.id AND l.status IN ('LOCKED','BOOKED')
+			) >= (
+				SELECT count(*) FROM seats
+				WHERE hall_id = s.hall_id AND status = 'ENABLED'
+			) THEN 'SOLD_OUT' ELSE 'OPEN' END
+		WHERE s.id = ? AND s.status IN ('OPEN','SOLD_OUT')`, sessionID).Error
+}

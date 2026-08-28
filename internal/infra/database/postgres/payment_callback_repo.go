@@ -47,7 +47,7 @@ func (r *PaymentCallbackRepo) InsertIfAbsent(ctx context.Context, cb *domain.Pay
 		CreatedAt:     time.Now(),
 	}
 	if err := r.db.db(ctx).Create(&row).Error; err != nil {
-		if errors.Is(err, gorm.ErrDuplicatedKey) {
+		if errors.Is(err, gorm.ErrDuplicatedKey) || isUniqueViolation(err) {
 			return false, nil
 		}
 		return false, err

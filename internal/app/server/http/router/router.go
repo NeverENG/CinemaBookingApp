@@ -24,6 +24,7 @@ func New(
 	dashboardHandler *handler.DashboardHandler,
 	changeHandler *handler.ChangeHandler,
 	healthHandler *handler.HealthHandler,
+	couponHandler *handler.AdminCouponHandler,
 ) *gin.Engine {
 	r := gin.Default()
 	r.GET("/healthz", healthHandler.Check)
@@ -72,8 +73,14 @@ func New(
 			admin.PATCH("/banners/:id", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), bannerHandler.Update)
 			admin.DELETE("/banners/:id", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), bannerHandler.Delete)
 
+			admin.POST("/coupons/templates", authMw.Admin(domain.RoleSuperAdmin), couponHandler.CreateTemplate)
+			admin.GET("/coupons/templates", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), couponHandler.ListTemplates)
+			admin.PATCH("/coupons/templates/:id/status", authMw.Admin(domain.RoleSuperAdmin), couponHandler.SetTemplateStatus)
+			admin.POST("/coupons/issue", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), couponHandler.IssueToUser)
+
 			dashboard := admin.Group("/dashboard", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin, domain.RoleFinance))
 			dashboard.GET("/box-office", dashboardHandler.Trend)
+			dashboard.GET("/box-office/summary", dashboardHandler.Summary)
 			dashboard.GET("/box-office/by-movie", dashboardHandler.ByMovie)
 			dashboard.GET("/box-office/by-cinema", dashboardHandler.ByCinema)
 			dashboard.POST("/box-office/reconcile", authMw.Admin(domain.RoleSuperAdmin), dashboardHandler.Reconcile)

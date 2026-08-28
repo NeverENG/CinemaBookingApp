@@ -12,6 +12,7 @@ import (
 type userRow struct {
 	ID                   int64  `gorm:"column:id;primaryKey"`
 	Username             string `gorm:"column:username"`
+	Email                string `gorm:"column:email"`
 	PasswordHash         string `gorm:"column:password_hash"`
 	Nickname             string `gorm:"column:nickname"`
 	MembershipLevelID    int64  `gorm:"column:membership_level_id"`
@@ -46,6 +47,7 @@ func (r *UserRepo) GetUserByID(ctx context.Context, id int64) (*domain.User, err
 	return &domain.User{
 		ID:                row.ID,
 		Username:          row.Username,
+		Email:             row.Email,
 		PasswordHash:      row.PasswordHash,
 		Nickname:          row.Nickname,
 		MembershipLevelID: row.MembershipLevelID,
@@ -65,9 +67,32 @@ func (r *UserRepo) GetByUsername(ctx context.Context, username string) (*domain.
 	return &domain.User{
 		ID:                row.ID,
 		Username:          row.Username,
+		Email:             row.Email,
 		PasswordHash:      row.PasswordHash,
 		Nickname:          row.Nickname,
 		MembershipLevelID: row.MembershipLevelID,
 		Status:            row.Status,
 	}, nil
+}
+
+func (r *UserRepo) Create(ctx context.Context, user *domain.User) error {
+	row := &userRow{
+		Username:     user.Username,
+		Email:        user.Email,
+		PasswordHash: user.PasswordHash,
+		Nickname:     user.Nickname,
+		Status:       user.Status,
+	}
+	if err := r.db.db(ctx).Create(row).Error; err != nil {
+		return err
+	}
+	user.ID = row.ID
+	return nil
+}
+
+func (r *UserRepo) UpdatePassword(ctx context.Context, userID int64, passwordHash string) error {
+	return r.db.db(ctx).
+		Model(&userRow{}).
+		Where("id = ?", userID).
+		Update("password_hash", passwordHash).Error
 }

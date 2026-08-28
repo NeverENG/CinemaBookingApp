@@ -32,7 +32,8 @@ func Error(c *gin.Context, err error) {
 		errors.Is(err, domain.ErrOrderNotFound),
 		errors.Is(err, domain.ErrPaymentNotFound),
 		errors.Is(err, domain.ErrMovieNotFound),
-		errors.Is(err, domain.ErrHallNotFound):
+		errors.Is(err, domain.ErrHallNotFound),
+		errors.Is(err, domain.ErrCinemaNotFound):
 		Fail(c, http.StatusNotFound, err.Error())
 	case errors.Is(err, domain.ErrSeatNotAvailable),
 		errors.Is(err, domain.ErrSeatLockConflict),
@@ -44,12 +45,20 @@ func Error(c *gin.Context, err error) {
 		errors.Is(err, domain.ErrSessionTimeConflict),
 		errors.Is(err, domain.ErrSessionLockedForChange),
 		errors.Is(err, domain.ErrOrderNotRefundable),
-		errors.Is(err, domain.ErrRefundExists):
+		errors.Is(err, domain.ErrRefundExists),
+		errors.Is(err, domain.ErrChangeMovieMismatch):
 		Fail(c, http.StatusConflict, err.Error())
 	case errors.Is(err, domain.ErrMovieInvalid),
 		errors.Is(err, domain.ErrHallInvalid),
 		errors.Is(err, domain.ErrSeatLayoutInvalid),
-		errors.Is(err, domain.ErrSessionInvalid):
+		errors.Is(err, domain.ErrSessionInvalid),
+		errors.Is(err, domain.ErrInvalidInput):
+		Fail(c, http.StatusBadRequest, err.Error())
+	case errors.Is(err, domain.ErrUsernameTaken):
+		Fail(c, http.StatusConflict, err.Error())
+	case errors.Is(err, domain.ErrEmailNotRegistered):
+		Fail(c, http.StatusNotFound, err.Error())
+	case errors.Is(err, domain.ErrResetCodeInvalid):
 		Fail(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, domain.ErrInvalidCredentials):
 		Fail(c, http.StatusUnauthorized, err.Error())

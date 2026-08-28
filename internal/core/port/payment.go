@@ -2,6 +2,7 @@ package port
 
 import (
 	"context"
+	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
 )
@@ -11,6 +12,7 @@ type PaymentRepo interface {
 	CreateTransaction(ctx context.Context, tx *domain.PaymentTransaction) error
 	GetByTransactionNo(ctx context.Context, transactionNo string) (*domain.PaymentTransaction, error)
 	GetByOrderNo(ctx context.Context, orderNo string) (*domain.PaymentTransaction, error)
+	ListPendingOlderThan(ctx context.Context, before time.Time, limit int) ([]domain.PaymentTransaction, error)
 	Transition(ctx context.Context, transactionNo string, from, to domain.PaymentStatus, version int32) error
 }
 

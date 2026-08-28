@@ -44,4 +44,13 @@ var (
 
 	ErrOrderNotRefundable = errors.New("order not refundable")
 	ErrRefundExists       = errors.New("refund already exists")
+
+	ErrCinemaNotFound = errors.New("cinema not found")
+
+	ErrUsernameTaken       = errors.New("username already taken")
+	ErrInvalidInput        = errors.New("invalid input")
+	ErrChangeMovieMismatch = errors.New("change ticket must be same movie")
+
+	ErrEmailNotRegistered = errors.New("email not registered")
+	ErrResetCodeInvalid   = errors.New("reset code invalid or expired")
 )

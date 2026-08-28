@@ -38,7 +38,12 @@ func NewMovieRepo(db *DB) *MovieRepo {
 }
 
 func (r *MovieRepo) Create(ctx context.Context, movie *domain.Movie) error {
-	return r.db.db(ctx).Create(toMovieRow(movie)).Error
+	row := toMovieRow(movie)
+	if err := r.db.db(ctx).Create(row).Error; err != nil {
+		return err
+	}
+	movie.ID = row.ID // 回填数据库自增 ID
+	return nil
 }
 
 func (r *MovieRepo) GetByID(ctx context.Context, id int64) (*domain.Movie, error) {

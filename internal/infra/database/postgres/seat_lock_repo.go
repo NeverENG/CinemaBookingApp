@@ -56,7 +56,7 @@ func (r *SeatLockRepo) CreateLocks(ctx context.Context, locks []domain.SeatLock)
 		})
 	}
 	if err := r.db.db(ctx).Create(&rows).Error; err != nil {
-		if errors.Is(err, gorm.ErrDuplicatedKey) {
+		if errors.Is(err, gorm.ErrDuplicatedKey) || isUniqueViolation(err) {
 			return domain.ErrSeatLockConflict
 		}
 		return err

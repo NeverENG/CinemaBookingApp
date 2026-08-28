@@ -146,6 +146,7 @@ func (s *OrderSvc) CreateOrder(ctx context.Context, in CreateOrderInput) (*domai
 				SeatID:     seat.ID,
 				SeatNo:     seat.SeatNo,
 				PriceCents: prices[i],
+				TicketNo:   uid.TicketNo(),
 			})
 		}
 		order.Items = items
@@ -238,4 +239,35 @@ func (s *OrderSvc) ExpireOverdueOrders(ctx context.Context, now time.Time) (int,
 		processed++
 	}
 	return processed, nil
+}
+
+// CancelPending 用户取消待支付订单（改签回滚用）：释放锁、解锁券。
+func (s *OrderSvc) CancelPending(ctx context.Context, userID int64, orderNo string) error {
+	return s.tx.Run(ctx, func(txCtx context.Context) error {
+		order, err := s.orders.GetOrderByNo(txCtx, orderNo)
+		if err != nil {
+			return err
+		}
+		if order.UserID != userID {
+			return domain.ErrForbidden
+		}
+		if order.Status != domain.OrderPendingPayment {
+			return domain.ErrInvalidTransition
+		}
+		if err := order.Transition(domain.OrderEventUserCancel); err != nil {
+			return err
+		}
+		if err := s.orders.Transition(txCtx, orderNo, domain.OrderPendingPayment, domain.OrderCanceled, order.Version); err != nil {
+			return err
+		}
+		if err := s.locks.ReleaseByOrderNo(txCtx, orderNo, domain.SeatLockReleased); err != nil {
+			return err
+		}
+		if order.CouponInstanceID != nil {
+			if err := s.coupons.UnlockByOrderNo(txCtx, orderNo); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }

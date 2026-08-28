@@ -31,7 +31,12 @@ func NewBannerRepo(db *DB) *BannerRepo {
 }
 
 func (r *BannerRepo) Create(ctx context.Context, banner *domain.Banner) error {
-	return r.db.db(ctx).Create(toBannerRow(banner)).Error
+	row := toBannerRow(banner)
+	if err := r.db.db(ctx).Create(row).Error; err != nil {
+		return err
+	}
+	banner.ID = row.ID
+	return nil
 }
 
 func (r *BannerRepo) Update(ctx context.Context, banner *domain.Banner) error {

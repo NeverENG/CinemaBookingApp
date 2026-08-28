@@ -46,6 +46,16 @@ func ExchangeNo() string {
 	return "EX" + time.Now().Format("20060102150405") + randHex(4)
 }
 
+// ExternalTradeNo 生成支付渠道外部交易号。
+func ExternalTradeNo() string {
+	return "EXT" + randHex(8)
+}
+
+// ExternalRefundNo 生成退款渠道外部单号。
+func ExternalRefundNo() string {
+	return "EXR" + randHex(8)
+}
+
 func randHex(n int) string {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {

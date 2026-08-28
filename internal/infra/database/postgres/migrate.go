@@ -18,7 +18,8 @@ func ApplyAllMigrations(db *gorm.DB, dir string) error {
 	}
 	var files []string
 	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") {
+		// *_seed.sql 由入口在引导账号后单独执行（种子依赖 demo 用户）
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") && !strings.Contains(e.Name(), "_seed") {
 			files = append(files, filepath.Join(dir, e.Name()))
 		}
 	}

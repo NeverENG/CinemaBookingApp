@@ -31,7 +31,15 @@ func NewHallRepo(db *DB) *HallRepo {
 }
 
 func (r *HallRepo) Create(ctx context.Context, hall *domain.Hall) error {
-	return r.db.db(ctx).Create(toHallRow(hall)).Error
+	row := toHallRow(hall)
+	if err := r.db.db(ctx).Create(row).Error; err != nil {
+		if isFKViolation(err) {
+			return domain.ErrCinemaNotFound
+		}
+		return err
+	}
+	hall.ID = row.ID // 回填：后续 SyncSeats 需要真实 hall_id
+	return nil
 }
 
 func (r *HallRepo) GetByID(ctx context.Context, id int64) (*domain.Hall, error) {

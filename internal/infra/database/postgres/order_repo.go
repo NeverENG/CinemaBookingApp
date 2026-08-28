@@ -118,20 +118,6 @@ func (r *OrderRepo) ListExpiredPending(ctx context.Context, now time.Time) ([]do
 	return orders, nil
 }
 
-// IssueTickets 给订单明细写取票码（只补 ticket_no 为空的行）。
-func (r *OrderRepo) IssueTickets(ctx context.Context, orderNo string, tickets []domain.OrderItem) error {
-	for _, t := range tickets {
-		res := r.db.db(ctx).
-			Model(&orderItemRow{}).
-			Where("order_no = ? AND seat_id = ? AND ticket_no IS NULL", orderNo, t.SeatID).
-			Update("ticket_no", t.TicketNo)
-		if res.Error != nil {
-			return res.Error
-		}
-	}
-	return nil
-}
-
 // ExpirePendingBySessionID 过期场次下全部待支付订单，返回受影响订单号。
 func (r *OrderRepo) ExpirePendingBySessionID(ctx context.Context, sessionID int64) ([]string, error) {
 	var orderNos []string

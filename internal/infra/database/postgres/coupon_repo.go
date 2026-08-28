@@ -127,14 +127,19 @@ func (r *UserCouponRepo) ListRedeemableTemplates(ctx context.Context) ([]domain.
 }
 
 func (r *UserCouponRepo) CreateInstance(ctx context.Context, coupon *domain.UserCoupon) error {
-	return r.db.db(ctx).Create(&userCouponRow{
+	row := &userCouponRow{
 		CouponNo:   coupon.CouponNo,
 		TemplateID: coupon.TemplateID,
 		UserID:     coupon.UserID,
 		Status:     coupon.Status,
 		OrderNo:    coupon.OrderNo,
 		ExpireAt:   coupon.ExpireAt,
-	}).Error
+	}
+	if err := r.db.db(ctx).Create(row).Error; err != nil {
+		return err
+	}
+	coupon.ID = row.ID
+	return nil
 }
 
 // LockForOrder 条件 UPDATE：只有 UNUSED 的券能锁到，并发下仅一单成功。

@@ -79,12 +79,13 @@ func (s *RefundSvc) ApplyRefund(ctx context.Context, userID int64, in ApplyRefun
 		}
 
 		refund = &domain.Refund{
-			RefundNo:    uid.RefundNo(),
-			OrderNo:     order.OrderNo,
-			UserID:      order.UserID,
-			AmountCents: order.PaidCents,
-			Reason:      in.Reason,
-			Status:      domain.RefundPending,
+			RefundNo:         uid.RefundNo(),
+			OrderNo:          order.OrderNo,
+			UserID:           order.UserID,
+			AmountCents:      order.PaidCents,
+			Reason:           in.Reason,
+			Status:           domain.RefundPending,
+			ExternalRefundNo: uid.ExternalRefundNo(),
 		}
 		if err := s.refunds.Create(txCtx, refund); err != nil {
 			return err

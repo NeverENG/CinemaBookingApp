@@ -59,12 +59,17 @@ func (r *AdminRepo) Count(ctx context.Context) (int64, error) {
 }
 
 func (r *AdminRepo) Create(ctx context.Context, admin *domain.Admin) error {
-	return r.db.db(ctx).Create(&adminRow{
+	row := &adminRow{
 		Username:     admin.Username,
 		PasswordHash: admin.PasswordHash,
 		Nickname:     admin.Nickname,
 		RoleID:       admin.RoleID,
 		CinemaID:     admin.CinemaID,
 		Status:       admin.Status,
-	}).Error
+	}
+	if err := r.db.db(ctx).Create(row).Error; err != nil {
+		return err
+	}
+	admin.ID = row.ID
+	return nil
 }

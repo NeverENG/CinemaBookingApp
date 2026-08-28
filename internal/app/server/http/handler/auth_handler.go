@@ -17,7 +17,12 @@ func NewAuthHandler(auth *service.AuthSvc) *AuthHandler {
 	return &AuthHandler{auth: auth}
 }
 
-type loginRequest struct {
+type userLoginRequest struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type adminLoginRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
@@ -28,14 +33,98 @@ type loginResponse struct {
 	Role   string `json:"role"`
 }
 
-// UserLogin POST /api/v1/auth/login
-func (h *AuthHandler) UserLogin(c *gin.Context) {
-	var req loginRequest
+type registerRequest struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	Nickname string `json:"nickname" binding:"required"`
+}
+
+// Register POST /api/v1/auth/register
+func (h *AuthHandler) Register(c *gin.Context) {
+	var req registerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	token, user, err := h.auth.UserLogin(c.Request.Context(), req.Username, req.Password)
+	token, user, err := h.auth.Register(c.Request.Context(), req.Email, req.Password, req.Nickname)
+	if err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, loginResponse{Token: token, UserID: user.ID, Role: "USER"})
+}
+
+type changePasswordRequest struct {
+	OldPassword string `json:"old_password" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required"`
+}
+
+// ChangePassword POST /api/v1/me/password
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "invalid user")
+		return
+	}
+	var req changePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.auth.ChangePassword(c.Request.Context(), userID, req.OldPassword, req.NewPassword); err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, gin.H{"status": "ok"})
+}
+
+type resetRequest struct {
+	Email string `json:"email" binding:"required"`
+}
+
+// RequestPasswordReset POST /api/v1/auth/password-reset/request
+func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
+	var req resetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	devCode, err := h.auth.RequestPasswordReset(c.Request.Context(), req.Email)
+	if err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, gin.H{"status": "ok", "dev_code": devCode})
+}
+
+type resetPasswordRequest struct {
+	Email       string `json:"email" binding:"required"`
+	Code        string `json:"code" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required"`
+}
+
+// ResetPassword POST /api/v1/auth/password-reset/reset
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req resetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.auth.ResetPassword(c.Request.Context(), req.Email, req.Code, req.NewPassword); err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, gin.H{"status": "ok"})
+}
+
+// UserLogin POST /api/v1/auth/login
+func (h *AuthHandler) UserLogin(c *gin.Context) {
+	var req userLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	token, user, err := h.auth.UserLogin(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
 		resp.Error(c, err)
 		return
@@ -45,7 +134,7 @@ func (h *AuthHandler) UserLogin(c *gin.Context) {
 
 // AdminLogin POST /api/v1/admin/auth/login
 func (h *AuthHandler) AdminLogin(c *gin.Context) {
-	var req loginRequest
+	var req adminLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return

@@ -66,6 +66,22 @@ func (r *PaymentRepo) GetByOrderNo(ctx context.Context, orderNo string) (*domain
 	return toDomainPayment(row), nil
 }
 
+func (r *PaymentRepo) ListPendingOlderThan(ctx context.Context, before time.Time, limit int) ([]domain.PaymentTransaction, error) {
+	var rows []paymentRow
+	if err := r.db.db(ctx).
+		Where("status = ? AND created_at < ?", domain.PaymentPending, before).
+		Order("id").
+		Limit(limit).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	txs := make([]domain.PaymentTransaction, 0, len(rows))
+	for _, row := range rows {
+		txs = append(txs, *toDomainPayment(row))
+	}
+	return txs, nil
+}
+
 func (r *PaymentRepo) Transition(ctx context.Context, transactionNo string, from, to domain.PaymentStatus, version int32) error {
 	res := r.db.db(ctx).
 		Model(&paymentRow{}).

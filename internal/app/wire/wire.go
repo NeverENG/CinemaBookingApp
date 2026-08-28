@@ -4,7 +4,6 @@ package wire
 import (
 	"context"
 	"log"
-	"os"
 	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/app/job"
@@ -12,8 +11,10 @@ import (
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/middleware"
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/router"
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/service"
+	"github.com/NeverENG/CinemaBookingApp/internal/infra/config"
 	"github.com/NeverENG/CinemaBookingApp/internal/infra/database/postgres"
 	"github.com/NeverENG/CinemaBookingApp/internal/pkg/jwt"
+	"github.com/NeverENG/CinemaBookingApp/internal/pkg/mailer"
 	"github.com/gin-gonic/gin"
 	pgdriver "gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -27,18 +28,18 @@ type App struct {
 	Jobs   *job.Runner
 }
 
-// NewApp 按依赖方向手工组装：config → db → repos → services → handlers → router。
-func NewApp() (*App, error) {
-	dsn := os.Getenv("DB_DSN")
-	if dsn == "" {
-		dsn = "host=localhost user=postgres password=postgres dbname=cinema port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+// OpenDB 按配置打开数据库连接。
+func OpenDB(cfg config.Config) (*gorm.DB, error) {
+	db, err := gorm.Open(pgdriver.Open(cfg.DB.DSN()), &gorm.Config{})
+	if err != nil {
+		return nil, err
 	}
-	addr := os.Getenv("HTTP_ADDR")
-	if addr == "" {
-		addr = ":8080"
-	}
+	return db, nil
+}
 
-	db, err := gorm.Open(pgdriver.Open(dsn), &gorm.Config{})
+// NewApp 按依赖方向手工组装：config → db → repos → services → handlers → router。
+func NewApp(cfg config.Config) (*App, error) {
+	db, err := OpenDB(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -64,18 +65,29 @@ func NewApp() (*App, error) {
 	bannerRepo := postgres.NewBannerRepo(pg)
 	pointsRepo := postgres.NewPointsRepo(pg)
 	boxOfficeRepo := postgres.NewBoxOfficeRepo(pg)
+	passwordResetRepo := postgres.NewPasswordResetRepo(pg)
+	membershipRepo := postgres.NewMembershipRepo(pg)
+	mailerCfg := mailer.FromEnv()
 
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "dev-secret"
-	}
-	tokens := jwt.New(jwtSecret, 24*time.Hour)
+	tokens := jwt.New(cfg.JWTSecret, cfg.JWTExpire)
 
 	orderSvc := service.NewOrderSvc(txm, userRepo, sessionRepo, seatRepo, seatLockRepo, couponRepo, orderRepo)
-	paymentSvc := service.NewPaymentSvc(txm, paymentRepo, callbackRepo, orderRepo, seatLockRepo, couponRepo, pointsRepo, boxOfficeRepo)
-	authSvc := service.NewAuthSvc(userRepo, adminRepo, roleRepo, tokens)
+	paymentSvc := service.NewPaymentSvc(txm, paymentRepo, callbackRepo, orderRepo, seatLockRepo, couponRepo, pointsRepo, boxOfficeRepo, membershipRepo)
+	authSvc := service.NewAuthSvc(
+		userRepo, adminRepo, roleRepo, tokens,
+		service.Bootstrap{
+			AdminUsername: cfg.Admin.Username,
+			AdminPassword: cfg.Admin.Password,
+			DemoUsername:  cfg.Demo.Username,
+			DemoPassword:  cfg.Demo.Password,
+		},
+		passwordResetRepo, membershipRepo, mailerCfg, mailerCfg.Enabled(),
+	)
 	if err := authSvc.EnsureDefaultAdmin(context.Background()); err != nil {
 		log.Printf("ensure default admin: %v", err)
+	}
+	if err := authSvc.EnsureDemoUser(context.Background()); err != nil {
+		log.Printf("ensure demo user: %v", err)
 	}
 
 	movieSvc := service.NewAdminMovieSvc(movieRepo, operationLogRepo)
@@ -87,6 +99,7 @@ func NewApp() (*App, error) {
 	pointsSvc := service.NewPointsSvc(txm, pointsRepo, couponRepo)
 	refundSvc := service.NewRefundSvc(txm, orderRepo, refundRepo, paymentRepo, seatLockRepo, pointsRepo, sessionRepo, boxOfficeRepo)
 	boxOfficeSvc := service.NewBoxOfficeSvc(boxOfficeRepo)
+	changeSvc := service.NewChangeTicketSvc(orderRepo, sessionRepo, orderSvc, paymentSvc, refundSvc)
 
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
@@ -100,9 +113,11 @@ func NewApp() (*App, error) {
 	pointsHandler := handler.NewPointsHandler(pointsSvc)
 	refundHandler := handler.NewRefundHandler(refundSvc)
 	dashboardHandler := handler.NewDashboardHandler(boxOfficeSvc)
+	changeHandler := handler.NewChangeHandler(changeSvc)
+	healthHandler := handler.NewHealthHandler(db)
 	authMw := middleware.NewAuthMiddleware(tokens)
 
-	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler, refundHandler, dashboardHandler)
+	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler, refundHandler, dashboardHandler, changeHandler, healthHandler)
 
 	runner := job.NewRunner()
 	runner.Add("order_timeout", func(ctx context.Context) error {
@@ -113,9 +128,40 @@ func NewApp() (*App, error) {
 		_, err := paymentSvc.RetryCallbacks(ctx, 50)
 		return err
 	})
+	runner.Add("payment_timeout", func(ctx context.Context) error {
+		_, err := paymentSvc.CloseExpiredPending(ctx, 100)
+		return err
+	})
 	runner.Add("box_office_reconcile", func(ctx context.Context) error {
 		return boxOfficeSvc.Reconcile(ctx)
 	})
 
-	return &App{Engine: engine, DB: db, Addr: addr, Jobs: runner}, nil
+	return &App{Engine: engine, DB: db, Addr: cfg.HTTPAddr, Jobs: runner}, nil
+}
+
+// EnsureBootstrap 迁移后引导默认管理员与演示用户（迁移需要先于账号存在）。
+func EnsureBootstrap(cfg config.Config) error {
+	db, err := OpenDB(cfg)
+	if err != nil {
+		return err
+	}
+	pg := postgres.NewDB(db)
+	userRepo := postgres.NewUserRepo(pg)
+	adminRepo := postgres.NewAdminRepo(pg)
+	roleRepo := postgres.NewRoleRepo(pg)
+	tokens := jwt.New(cfg.JWTSecret, cfg.JWTExpire)
+	authSvc := service.NewAuthSvc(
+		userRepo, adminRepo, roleRepo, tokens,
+		service.Bootstrap{
+			AdminUsername: cfg.Admin.Username,
+			AdminPassword: cfg.Admin.Password,
+			DemoUsername:  cfg.Demo.Username,
+			DemoPassword:  cfg.Demo.Password,
+		},
+		postgres.NewPasswordResetRepo(pg), postgres.NewMembershipRepo(pg), mailer.FromEnv(), false,
+	)
+	if err := authSvc.EnsureDefaultAdmin(context.Background()); err != nil {
+		return err
+	}
+	return authSvc.EnsureDemoUser(context.Background())
 }

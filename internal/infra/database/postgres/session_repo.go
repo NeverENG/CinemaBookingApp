@@ -56,7 +56,7 @@ func (r *SessionRepo) GetSessionByID(ctx context.Context, id int64) (*domain.Sho
 }
 
 func (r *SessionRepo) Create(ctx context.Context, session *domain.ShowSession) error {
-	return r.db.db(ctx).Create(&showSessionRow{
+	row := &showSessionRow{
 		CinemaID:       session.CinemaID,
 		HallID:         session.HallID,
 		MovieID:        session.MovieID,
@@ -64,7 +64,12 @@ func (r *SessionRepo) Create(ctx context.Context, session *domain.ShowSession) e
 		EndTime:        session.EndTime,
 		BasePriceCents: session.BasePriceCents,
 		Status:         session.Status,
-	}).Error
+	}
+	if err := r.db.db(ctx).Create(row).Error; err != nil {
+		return err
+	}
+	session.ID = row.ID
+	return nil
 }
 
 func (r *SessionRepo) UpdatePrice(ctx context.Context, id int64, basePriceCents int64, priceRulesJSON string) error {

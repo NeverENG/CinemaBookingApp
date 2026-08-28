@@ -65,13 +65,73 @@ func (f *fakeRoleRepo) Ensure(ctx context.Context, roles []domain.Role) error {
 }
 
 func newAuthTestSvc(users *fakeUserRepo, admins *fakeAdminRepo, roles *fakeRoleRepo) *AuthSvc {
-	return NewAuthSvc(users, admins, roles, jwt.New("test-secret", time.Hour))
+	return NewAuthSvc(users, admins, roles, jwt.New("test-secret", time.Hour), Bootstrap{
+		AdminUsername: "admin",
+		AdminPassword: "admin123",
+		DemoUsername:  "demo",
+		DemoPassword:  "demo123",
+	}, &fakePasswordResetRepo{}, &fakeMembershipRepo{}, &fakeMailSender{}, false)
+}
+
+type fakePasswordResetRepo struct {
+	codes map[string][]*domain.PasswordResetCode
+}
+
+func (f *fakePasswordResetRepo) Create(ctx context.Context, code *domain.PasswordResetCode) error {
+	if f.codes == nil {
+		f.codes = make(map[string][]*domain.PasswordResetCode)
+	}
+	code.ID = int64(len(f.codes[code.Email]) + 1)
+	f.codes[code.Email] = append(f.codes[code.Email], code)
+	return nil
+}
+
+func (f *fakePasswordResetRepo) FindUnusedByEmail(ctx context.Context, email string) (*domain.PasswordResetCode, error) {
+	codes := f.codes[email]
+	for i := len(codes) - 1; i >= 0; i-- {
+		c := codes[i]
+		if c.UsedAt == nil && c.ExpiresAt.After(time.Now()) {
+			return c, nil
+		}
+	}
+	return nil, domain.ErrResetCodeInvalid
+}
+
+func (f *fakePasswordResetRepo) MarkUsed(ctx context.Context, id int64) error {
+	for _, codes := range f.codes {
+		for _, c := range codes {
+			if c.ID == id {
+				now := time.Now()
+				c.UsedAt = &now
+				return nil
+			}
+		}
+	}
+	return domain.ErrResetCodeInvalid
+}
+
+type fakeMembershipRepo struct {
+	upgrades int
+}
+
+func (f *fakeMembershipRepo) UpgradeIfNeeded(ctx context.Context, userID int64) (bool, error) {
+	f.upgrades++
+	return false, nil
+}
+
+type fakeMailSender struct {
+	sent []string
+}
+
+func (f *fakeMailSender) Send(to, subject, body string) error {
+	f.sent = append(f.sent, to)
+	return nil
 }
 
 func TestUserLogin(t *testing.T) {
 	hash, _ := crypto.HashPassword("pass123")
 	users := &fakeUserRepo{users: map[int64]*domain.User{
-		1: {ID: 1, Username: "alice", PasswordHash: hash, Status: "ACTIVE"},
+		1: {ID: 1, Username: "alice", Email: "alice", PasswordHash: hash, Status: "ACTIVE"},
 	}}
 	svc := newAuthTestSvc(users, &fakeAdminRepo{}, &fakeRoleRepo{})
 
@@ -87,7 +147,7 @@ func TestUserLogin(t *testing.T) {
 func TestUserLoginWrongPassword(t *testing.T) {
 	hash, _ := crypto.HashPassword("pass123")
 	users := &fakeUserRepo{users: map[int64]*domain.User{
-		1: {ID: 1, Username: "alice", PasswordHash: hash, Status: "ACTIVE"},
+		1: {ID: 1, Username: "alice@example.com", Email: "alice@example.com", PasswordHash: hash, Status: "ACTIVE"},
 	}}
 	svc := newAuthTestSvc(users, &fakeAdminRepo{}, &fakeRoleRepo{})
 
@@ -132,5 +192,110 @@ func TestEnsureDefaultAdmin(t *testing.T) {
 	admin := admins.admins["admin"]
 	if !crypto.CheckPassword(admin.PasswordHash, "admin123") {
 		t.Fatal("default admin password mismatch")
+	}
+}
+
+func TestRegister(t *testing.T) {
+	users := &fakeUserRepo{}
+	svc := newAuthTestSvc(users, &fakeAdminRepo{}, &fakeRoleRepo{})
+
+	token, user, err := svc.Register(context.Background(), "newbie@example.com", "pass123", "新用户")
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if token == "" || user.ID == 0 {
+		t.Fatal("expected token and user id")
+	}
+	if users.users[user.ID].Username != "newbie@example.com" || users.users[user.ID].Email != "newbie@example.com" {
+		t.Fatal("user not stored")
+	}
+}
+
+func TestRegisterDuplicate(t *testing.T) {
+	hash, _ := crypto.HashPassword("pass123")
+	users := &fakeUserRepo{users: map[int64]*domain.User{
+		1: {ID: 1, Username: "alice@example.com", Email: "alice@example.com", PasswordHash: hash, Status: "ACTIVE"},
+	}}
+	svc := newAuthTestSvc(users, &fakeAdminRepo{}, &fakeRoleRepo{})
+
+	_, _, err := svc.Register(context.Background(), "alice@example.com", "pass123", "A")
+	if !errors.Is(err, domain.ErrUsernameTaken) {
+		t.Fatalf("expected ErrUsernameTaken, got %v", err)
+	}
+}
+
+func TestRegisterWeakPassword(t *testing.T) {
+	svc := newAuthTestSvc(&fakeUserRepo{}, &fakeAdminRepo{}, &fakeRoleRepo{})
+
+	_, _, err := svc.Register(context.Background(), "newbie@example.com", "123", "新用户")
+	if !errors.Is(err, domain.ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput, got %v", err)
+	}
+}
+
+func TestChangePassword(t *testing.T) {
+	hash, _ := crypto.HashPassword("old123")
+	users := &fakeUserRepo{users: map[int64]*domain.User{
+		1: {ID: 1, Username: "alice@example.com", Email: "alice@example.com", PasswordHash: hash, Status: "ACTIVE"},
+	}}
+	svc := newAuthTestSvc(users, &fakeAdminRepo{}, &fakeRoleRepo{})
+
+	if err := svc.ChangePassword(context.Background(), 1, "old123", "new123"); err != nil {
+		t.Fatalf("change password: %v", err)
+	}
+	if !crypto.CheckPassword(users.users[1].PasswordHash, "new123") {
+		t.Fatal("password not updated")
+	}
+}
+
+func TestRequestAndResetPassword(t *testing.T) {
+	hash, _ := crypto.HashPassword("old123")
+	users := &fakeUserRepo{users: map[int64]*domain.User{
+		1: {ID: 1, Username: "alice@example.com", Email: "alice@example.com", PasswordHash: hash, Status: "ACTIVE"},
+	}}
+	resets := &fakePasswordResetRepo{}
+	sender := &fakeMailSender{}
+	svc := NewAuthSvc(users, &fakeAdminRepo{}, &fakeRoleRepo{}, jwt.New("test-secret", time.Hour), Bootstrap{
+		AdminUsername: "admin", AdminPassword: "admin123", DemoUsername: "demo", DemoPassword: "demo123",
+	}, resets, &fakeMembershipRepo{}, sender, true)
+
+	devCode, err := svc.RequestPasswordReset(context.Background(), "alice@example.com")
+	if err != nil {
+		t.Fatalf("request reset: %v", err)
+	}
+	if devCode != "" {
+		t.Fatal("SMTP enabled should not return dev code")
+	}
+	if len(sender.sent) != 1 || sender.sent[0] != "alice@example.com" {
+		t.Fatalf("expected mail sent, got %v", sender.sent)
+	}
+
+	if err := svc.ResetPassword(context.Background(), "alice@example.com", devCode, "new123"); !errors.Is(err, domain.ErrResetCodeInvalid) {
+		t.Fatalf("expected invalid code without devCode, got %v", err)
+	}
+}
+
+func TestResetPasswordDevMode(t *testing.T) {
+	hash, _ := crypto.HashPassword("old123")
+	users := &fakeUserRepo{users: map[int64]*domain.User{
+		1: {ID: 1, Username: "alice@example.com", Email: "alice@example.com", PasswordHash: hash, Status: "ACTIVE"},
+	}}
+	resets := &fakePasswordResetRepo{}
+	svc := NewAuthSvc(users, &fakeAdminRepo{}, &fakeRoleRepo{}, jwt.New("test-secret", time.Hour), Bootstrap{
+		AdminUsername: "admin", AdminPassword: "admin123", DemoUsername: "demo", DemoPassword: "demo123",
+	}, resets, &fakeMembershipRepo{}, &fakeMailSender{}, false)
+
+	devCode, err := svc.RequestPasswordReset(context.Background(), "alice@example.com")
+	if err != nil {
+		t.Fatalf("request reset: %v", err)
+	}
+	if len(devCode) != 6 {
+		t.Fatalf("expected 6-digit dev code, got %q", devCode)
+	}
+	if err := svc.ResetPassword(context.Background(), "alice@example.com", devCode, "new123"); err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+	if !crypto.CheckPassword(users.users[1].PasswordHash, "new123") {
+		t.Fatal("password not reset")
 	}
 }

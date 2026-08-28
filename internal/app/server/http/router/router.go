@@ -22,11 +22,18 @@ func New(
 	pointsHandler *handler.PointsHandler,
 	refundHandler *handler.RefundHandler,
 	dashboardHandler *handler.DashboardHandler,
+	changeHandler *handler.ChangeHandler,
+	healthHandler *handler.HealthHandler,
 ) *gin.Engine {
 	r := gin.Default()
+	r.GET("/healthz", healthHandler.Check)
 	v1 := r.Group("/api/v1")
 	{
 		v1.POST("/auth/login", authHandler.UserLogin)
+		v1.POST("/auth/register", authHandler.Register)
+		v1.POST("/auth/password-reset/request", authHandler.RequestPasswordReset)
+		v1.POST("/auth/password-reset/reset", authHandler.ResetPassword)
+		v1.POST("/me/password", authMw.User(), authHandler.ChangePassword)
 		v1.POST("/admin/auth/login", authHandler.AdminLogin)
 		v1.GET("/sessions", userSessionHandler.List)
 		v1.GET("/sessions/:id/seats", userSessionHandler.GetSeatMap)
@@ -34,6 +41,7 @@ func New(
 		v1.POST("/orders", authMw.User(), orderHandler.Create)
 		v1.GET("/orders/:order_no", authMw.User(), orderHandler.Get)
 		v1.POST("/orders/:order_no/refund", authMw.User(), refundHandler.Apply)
+		v1.POST("/orders/:order_no/change", authMw.User(), changeHandler.Change)
 		v1.POST("/payments", authMw.User(), paymentHandler.Create)
 		v1.POST("/payments/mock-pay", authMw.User(), paymentHandler.MockPay)
 		v1.GET("/payments/order/:order_no", authMw.User(), paymentHandler.GetByOrder)

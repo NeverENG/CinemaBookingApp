@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/app/wire"
+	"github.com/NeverENG/CinemaBookingApp/internal/infra/config"
 	"github.com/NeverENG/CinemaBookingApp/internal/infra/database/postgres"
 )
 
@@ -15,17 +16,28 @@ func main() {
 	migrate := flag.Bool("migrate", false, "apply sql/migrations and exit")
 	flag.Parse()
 
-	app, err := wire.NewApp()
-	if err != nil {
-		log.Fatalf("init app: %v", err)
-	}
-
+	cfg := config.Load()
 	if *migrate {
-		if err := postgres.ApplyAllMigrations(app.DB, "sql/migrations"); err != nil {
+		db, err := wire.OpenDB(cfg)
+		if err != nil {
+			log.Fatalf("open db: %v", err)
+		}
+		if err := postgres.ApplyAllMigrations(db, "sql/migrations"); err != nil {
 			log.Fatalf("migrate: %v", err)
+		}
+		if err := wire.EnsureBootstrap(cfg); err != nil {
+			log.Fatalf("bootstrap: %v", err)
+		}
+		if err := postgres.ApplyMigrations(db, "sql/migrations/migrations010_seed_data.sql"); err != nil {
+			log.Fatalf("seed: %v", err)
 		}
 		log.Println("migrations applied")
 		return
+	}
+
+	app, err := wire.NewApp(cfg)
+	if err != nil {
+		log.Fatalf("init app: %v", err)
 	}
 
 	log.Printf("listening on %s", app.Addr)

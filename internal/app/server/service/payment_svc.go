@@ -22,6 +22,7 @@ type PaymentSvc struct {
 	coupons   port.UserCouponRepo
 	points    port.PointsRepo
 	box       port.BoxOfficeRepo
+	members   port.MembershipRepo
 }
 
 func NewPaymentSvc(
@@ -33,6 +34,7 @@ func NewPaymentSvc(
 	coupons port.UserCouponRepo,
 	points port.PointsRepo,
 	box port.BoxOfficeRepo,
+	members port.MembershipRepo,
 ) *PaymentSvc {
 	return &PaymentSvc{
 		tx:        tx,
@@ -43,6 +45,7 @@ func NewPaymentSvc(
 		coupons:   coupons,
 		points:    points,
 		box:       box,
+		members:   members,
 	}
 }
 
@@ -76,14 +79,15 @@ func (s *PaymentSvc) CreatePayment(ctx context.Context, in CreatePaymentInput) (
 		}
 
 		payment = &domain.PaymentTransaction{
-			TransactionNo: uid.TransactionNo(),
-			OrderNo:       order.OrderNo,
-			UserID:        order.UserID,
-			AmountCents:   order.PaidCents,
-			Channel:       mockPayChannel,
-			Status:        domain.PaymentPending,
-			Version:       1,
-			CreatedAt:     time.Now(),
+			TransactionNo:   uid.TransactionNo(),
+			OrderNo:         order.OrderNo,
+			UserID:          order.UserID,
+			AmountCents:     order.PaidCents,
+			Channel:         mockPayChannel,
+			ExternalTradeNo: uid.ExternalTradeNo(),
+			Status:          domain.PaymentPending,
+			Version:         1,
+			CreatedAt:       time.Now(),
 		}
 		return s.payments.CreateTransaction(txCtx, payment)
 	})
@@ -165,23 +169,14 @@ func (s *PaymentSvc) HandleMockCallback(ctx context.Context, in MockCallbackInpu
 			return err
 		}
 
-		tickets := make([]domain.OrderItem, 0, len(order.Items))
-		for _, item := range order.Items {
-			tickets = append(tickets, domain.OrderItem{
-				OrderNo:  order.OrderNo,
-				SeatID:   item.SeatID,
-				TicketNo: uid.TicketNo(),
-			})
-		}
-		if err := s.orders.IssueTickets(txCtx, order.OrderNo, tickets); err != nil {
-			return err
-		}
-
 		if err := s.coupons.MarkUsedByOrderNo(txCtx, order.OrderNo); err != nil {
 			return err
 		}
 
 		if err := s.points.GrantOnPaid(txCtx, order.UserID, order.PaidCents, order.OrderNo); err != nil {
+			return err
+		}
+		if _, err := s.members.UpgradeIfNeeded(txCtx, order.UserID); err != nil {
 			return err
 		}
 		if err := s.box.Record(txCtx, domain.NewPaidEvent(order, order.OrderNo, time.Now())); err != nil {
@@ -193,6 +188,8 @@ func (s *PaymentSvc) HandleMockCallback(ctx context.Context, in MockCallbackInpu
 }
 
 const maxCallbackRetryAttempts = 5
+
+const paymentPendingTTL = 15 * time.Minute
 
 // RetryCallbacks 定时任务：重试未处理/失败的回调，返回失败数量。
 func (s *PaymentSvc) RetryCallbacks(ctx context.Context, limit int) (int, error) {
@@ -218,6 +215,55 @@ func (s *PaymentSvc) RetryCallbacks(ctx context.Context, limit int) (int, error)
 		}
 	}
 	return failed, nil
+}
+
+// CloseExpiredPending 定时任务：关闭超时未支付的 PENDING 交易；
+// 订单已支付/退款中的交易不关闭（避免影响退款链路）。
+func (s *PaymentSvc) CloseExpiredPending(ctx context.Context, limit int) (int, error) {
+	txs, err := s.payments.ListPendingOlderThan(ctx, time.Now().Add(-paymentPendingTTL), limit)
+	if err != nil {
+		return 0, err
+	}
+	closed := 0
+	for _, tx := range txs {
+		didClose := false
+		err := s.tx.Run(ctx, func(txCtx context.Context) error {
+			current, err := s.payments.GetByTransactionNo(txCtx, tx.TransactionNo)
+			if err != nil {
+				if errors.Is(err, domain.ErrPaymentNotFound) {
+					return nil
+				}
+				return err
+			}
+			if current.Status != domain.PaymentPending {
+				return nil
+			}
+			order, err := s.orders.GetOrderByNo(txCtx, current.OrderNo)
+			if err == nil {
+				switch order.Status {
+				case domain.OrderPaid, domain.OrderRefunding, domain.OrderRefunded, domain.OrderCompleted:
+					return nil
+				}
+			} else if !errors.Is(err, domain.ErrOrderNotFound) {
+				return err
+			}
+			if err := current.Transition(domain.PaymentEventClose); err != nil {
+				return err
+			}
+			if err := s.payments.Transition(txCtx, current.TransactionNo, domain.PaymentPending, domain.PaymentClosed, current.Version); err != nil {
+				return err
+			}
+			didClose = true
+			return nil
+		})
+		if err != nil {
+			return closed, err
+		}
+		if didClose {
+			closed++
+		}
+	}
+	return closed, nil
 }
 
 // MockPay 模拟支付页确认：生成回调事件并走完整回调链路（幂等）。

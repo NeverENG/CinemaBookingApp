@@ -46,7 +46,7 @@ func TestRetryCallbacks(t *testing.T) {
 	orders := &fakeOrderRepo{orders: map[string]*domain.Order{"O1": order}}
 	payments := &fakePaymentRepo{}
 	callbacks := &fakeCallbackRepo{}
-	svc := newPaymentTestSvc(orders, payments, callbacks, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{})
+	svc := newPaymentTestSvc(orders, payments, callbacks, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeMembershipRepo{})
 
 	tx, _ := svc.CreatePayment(context.Background(), CreatePaymentInput{OrderNo: "O1"})
 	callbacks.callbacks = map[string]*domain.PaymentCallback{

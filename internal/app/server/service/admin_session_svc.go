@@ -181,7 +181,7 @@ func (s *AdminSessionSvc) refundOrder(ctx context.Context, order domain.Order) e
 		AmountCents:      order.PaidCents,
 		Reason:           "session_canceled",
 		Status:           domain.RefundSuccess,
-		ExternalRefundNo: uid.RefundNo(),
+		ExternalRefundNo: uid.ExternalRefundNo(),
 	}
 	if err := s.refunds.Create(ctx, refund); err != nil {
 		return err

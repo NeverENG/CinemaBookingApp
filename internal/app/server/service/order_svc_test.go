@@ -35,6 +35,23 @@ func (f *fakeUserRepo) GetByUsername(ctx context.Context, username string) (*dom
 	return nil, domain.ErrUserNotFound
 }
 
+func (f *fakeUserRepo) Create(ctx context.Context, user *domain.User) error {
+	if f.users == nil {
+		f.users = make(map[int64]*domain.User)
+	}
+	user.ID = int64(len(f.users) + 1)
+	f.users[user.ID] = user
+	return nil
+}
+
+func (f *fakeUserRepo) UpdatePassword(ctx context.Context, userID int64, passwordHash string) error {
+	if u, ok := f.users[userID]; ok {
+		u.PasswordHash = passwordHash
+		return nil
+	}
+	return domain.ErrUserNotFound
+}
+
 type fakeSessionRepo struct {
 	sessions map[int64]*domain.ShowSession
 }
@@ -286,23 +303,6 @@ func (f *fakeOrderRepo) ListExpiredPending(ctx context.Context, now time.Time) (
 	return out, nil
 }
 
-func (f *fakeOrderRepo) IssueTickets(ctx context.Context, orderNo string, tickets []domain.OrderItem) error {
-	o := f.orders[orderNo]
-	if o == nil {
-		return domain.ErrOrderNotFound
-	}
-	bySeat := make(map[int64]string, len(tickets))
-	for _, t := range tickets {
-		bySeat[t.SeatID] = t.TicketNo
-	}
-	for i := range o.Items {
-		if no, ok := bySeat[o.Items[i].SeatID]; ok {
-			o.Items[i].TicketNo = no
-		}
-	}
-	return nil
-}
-
 func (f *fakeOrderRepo) ExpirePendingBySessionID(ctx context.Context, sessionID int64) ([]string, error) {
 	var nos []string
 	for _, o := range f.orders {
@@ -392,6 +392,9 @@ func TestCreateOrderHappyPath(t *testing.T) {
 	}
 	if len(order.Items) != 2 {
 		t.Fatalf("expected 2 items, got %d", len(order.Items))
+	}
+	if order.Items[0].TicketNo == "" || order.Items[1].TicketNo == "" {
+		t.Fatal("expected ticket_no generated at order creation")
 	}
 	if len(locks.locked) != 2 {
 		t.Fatalf("expected 2 locks, got %d", len(locks.locked))

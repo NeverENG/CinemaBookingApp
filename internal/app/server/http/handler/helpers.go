@@ -35,3 +35,13 @@ func adminScopeFrom(c *gin.Context) (domain.AdminScope, bool) {
 	}
 	return scope, true
 }
+
+// userIDFrom 从 JWT 中间件注入的上下文取用户 ID。
+func userIDFrom(c *gin.Context) (int64, bool) {
+	v, exists := c.Get(middleware.CtxUserID)
+	if !exists {
+		return 0, false
+	}
+	id, ok := v.(int64)
+	return id, ok && id > 0
+}

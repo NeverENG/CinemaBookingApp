@@ -90,3 +90,29 @@ func (r *SeatLockRepo) ReleaseBySessionID(ctx context.Context, sessionID int64, 
 			"released_at": time.Now(),
 		}).Error
 }
+
+func (r *SeatLockRepo) ListActiveBySessionID(ctx context.Context, sessionID int64) ([]domain.SeatLock, error) {
+	var rows []seatLockRow
+	if err := r.db.db(ctx).
+		Where("session_id = ? AND status IN ?", sessionID, []domain.SeatLockStatus{domain.SeatLockLocked, domain.SeatLockBooked}).
+		Order("id").
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	locks := make([]domain.SeatLock, 0, len(rows))
+	for _, row := range rows {
+		locks = append(locks, domain.SeatLock{
+			ID:         row.ID,
+			SessionID:  row.SessionID,
+			SeatID:     row.SeatID,
+			UserID:     row.UserID,
+			OrderNo:    row.OrderNo,
+			LockToken:  row.LockToken,
+			Status:     row.Status,
+			ExpiresAt:  row.ExpiresAt,
+			ReleasedAt: row.ReleasedAt,
+			CreatedAt:  row.CreatedAt,
+		})
+	}
+	return locks, nil
+}

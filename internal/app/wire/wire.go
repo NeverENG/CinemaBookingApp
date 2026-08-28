@@ -59,6 +59,8 @@ func NewApp() (*App, error) {
 	hallRepo := postgres.NewHallRepo(pg)
 	operationLogRepo := postgres.NewOperationLogRepo(pg)
 	refundRepo := postgres.NewRefundRepo(pg)
+	bannerRepo := postgres.NewBannerRepo(pg)
+	pointsRepo := postgres.NewPointsRepo(pg)
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -67,7 +69,7 @@ func NewApp() (*App, error) {
 	tokens := jwt.New(jwtSecret, 24*time.Hour)
 
 	orderSvc := service.NewOrderSvc(txm, userRepo, sessionRepo, seatRepo, seatLockRepo, couponRepo, orderRepo)
-	paymentSvc := service.NewPaymentSvc(txm, paymentRepo, callbackRepo, orderRepo, seatLockRepo, couponRepo)
+	paymentSvc := service.NewPaymentSvc(txm, paymentRepo, callbackRepo, orderRepo, seatLockRepo, couponRepo, pointsRepo)
 	authSvc := service.NewAuthSvc(userRepo, adminRepo, roleRepo, tokens)
 	if err := authSvc.EnsureDefaultAdmin(context.Background()); err != nil {
 		log.Printf("ensure default admin: %v", err)
@@ -75,7 +77,11 @@ func NewApp() (*App, error) {
 
 	movieSvc := service.NewAdminMovieSvc(movieRepo, operationLogRepo)
 	hallSvc := service.NewAdminHallSvc(hallRepo, seatRepo, operationLogRepo)
-	sessionSvc := service.NewAdminSessionSvc(sessionRepo, movieRepo, hallRepo, seatLockRepo, orderRepo, couponRepo, refundRepo, paymentRepo, operationLogRepo)
+	sessionSvc := service.NewAdminSessionSvc(sessionRepo, movieRepo, hallRepo, seatLockRepo, orderRepo, couponRepo, refundRepo, paymentRepo, pointsRepo, operationLogRepo)
+	seatMapSvc := service.NewSeatMapSvc(sessionRepo, seatRepo, seatLockRepo, movieRepo, hallRepo)
+	homeSvc := service.NewHomeSvc(bannerRepo, movieRepo, orderRepo)
+	bannerSvc := service.NewAdminBannerSvc(bannerRepo, operationLogRepo)
+	pointsSvc := service.NewPointsSvc(pointsRepo)
 
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
@@ -83,8 +89,12 @@ func NewApp() (*App, error) {
 	movieHandler := handler.NewAdminMovieHandler(movieSvc)
 	hallHandler := handler.NewAdminHallHandler(hallSvc)
 	sessionHandler := handler.NewAdminSessionHandler(sessionSvc)
+	userSessionHandler := handler.NewSessionHandler(seatMapSvc)
+	homeHandler := handler.NewHomeHandler(homeSvc)
+	bannerHandler := handler.NewAdminBannerHandler(bannerSvc)
+	pointsHandler := handler.NewPointsHandler(pointsSvc)
 	authMw := middleware.NewAuthMiddleware(tokens)
 
-	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler)
+	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler)
 	return &App{Engine: engine, DB: db, Addr: addr}, nil
 }

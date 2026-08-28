@@ -74,3 +74,42 @@ func (h *PaymentHandler) MockCallback(c *gin.Context) {
 	}
 	resp.OK(c, gin.H{"status": "success"})
 }
+
+type mockPayRequest struct {
+	TransactionNo string `json:"transaction_no" binding:"required"`
+}
+
+// MockPay POST /api/v1/payments/mock-pay
+// 模拟支付页「确认支付」，生成回调事件并走完整出票链路。
+func (h *PaymentHandler) MockPay(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "invalid user")
+		return
+	}
+	var req mockPayRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.payments.MockPay(c.Request.Context(), userID, req.TransactionNo); err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, gin.H{"status": "success"})
+}
+
+// GetByOrder GET /api/v1/payments/order/:order_no（支付状态轮询）
+func (h *PaymentHandler) GetByOrder(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "invalid user")
+		return
+	}
+	payment, err := h.payments.GetByOrder(c.Request.Context(), userID, c.Param("order_no"))
+	if err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, payment)
+}

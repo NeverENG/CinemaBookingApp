@@ -14,4 +14,5 @@ type SeatLockRepo interface {
 	MarkBookedByOrderNo(ctx context.Context, orderNo string) error
 	ReleaseByOrderNo(ctx context.Context, orderNo string, status domain.SeatLockStatus) error
 	ReleaseBySessionID(ctx context.Context, sessionID int64, status domain.SeatLockStatus) error
+	ListActiveBySessionID(ctx context.Context, sessionID int64) ([]domain.SeatLock, error)
 }

@@ -156,6 +156,31 @@ func (r *OrderRepo) ListPaidBySessionID(ctx context.Context, sessionID int64) ([
 	return orders, nil
 }
 
+func (r *OrderRepo) CountPaidByMovieIDs(ctx context.Context, movieIDs []int64) (map[int64]int64, error) {
+	if len(movieIDs) == 0 {
+		return map[int64]int64{}, nil
+	}
+	type movieSold struct {
+		MovieID int64
+		Cnt     int64
+	}
+	var rows []movieSold
+	err := r.db.db(ctx).
+		Model(&orderRow{}).
+		Select("movie_id, count(*) AS cnt").
+		Where("status = ? AND movie_id IN ?", domain.OrderPaid, movieIDs).
+		Group("movie_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[int64]int64, len(rows))
+	for _, row := range rows {
+		counts[row.MovieID] = row.Cnt
+	}
+	return counts, nil
+}
+
 func (r *OrderRepo) ListOrdersByUserID(ctx context.Context, userID int64) ([]domain.Order, error) {
 	var rows []orderRow
 	if err := r.db.db(ctx).Where("user_id = ?", userID).Order("created_at DESC").Find(&rows).Error; err != nil {

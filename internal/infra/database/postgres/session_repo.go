@@ -115,3 +115,34 @@ func (r *SessionRepo) ListOverlapping(ctx context.Context, hallID int64, start, 
 	}
 	return sessions, nil
 }
+
+func (r *SessionRepo) ListByFilter(ctx context.Context, movieID, cinemaID int64) ([]domain.ShowSession, error) {
+	q := r.db.db(ctx)
+	if movieID > 0 {
+		q = q.Where("movie_id = ?", movieID)
+	}
+	if cinemaID > 0 {
+		q = q.Where("cinema_id = ?", cinemaID)
+	}
+	var rows []showSessionRow
+	if err := q.
+		Where("status IN ?", []domain.SessionStatus{domain.SessionOpen, domain.SessionSoldOut}).
+		Order("start_time").
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	sessions := make([]domain.ShowSession, 0, len(rows))
+	for _, row := range rows {
+		sessions = append(sessions, domain.ShowSession{
+			ID:             row.ID,
+			CinemaID:       row.CinemaID,
+			HallID:         row.HallID,
+			MovieID:        row.MovieID,
+			StartTime:      row.StartTime,
+			EndTime:        row.EndTime,
+			BasePriceCents: row.BasePriceCents,
+			Status:         row.Status,
+		})
+	}
+	return sessions, nil
+}

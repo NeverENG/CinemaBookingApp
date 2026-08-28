@@ -206,7 +206,7 @@ func TestAdminSessionCreate(t *testing.T) {
 	halls := &fakeHallRepo{halls: map[int64]*domain.Hall{
 		10: {ID: 10, CinemaID: 100, Name: "1号厅"},
 	}}
-	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakeOperationLogRepo{})
+	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeOperationLogRepo{})
 
 	session, err := svc.Create(context.Background(), superAdminScope, SessionInput{
 		CinemaID:       100,
@@ -235,7 +235,7 @@ func TestAdminSessionCreateOverlap(t *testing.T) {
 	halls := &fakeHallRepo{halls: map[int64]*domain.Hall{
 		10: {ID: 10, CinemaID: 100, Name: "1号厅"},
 	}}
-	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakeOperationLogRepo{})
+	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeOperationLogRepo{})
 
 	_, err := svc.Create(context.Background(), superAdminScope, SessionInput{
 		CinemaID:       100,
@@ -267,8 +267,9 @@ func TestAdminSessionCancel(t *testing.T) {
 	payments := &fakePaymentRepo{txns: map[string]*domain.PaymentTransaction{
 		"T2": {TransactionNo: "T2", OrderNo: "O2", Status: domain.PaymentSuccess, Version: 1},
 	}}
+	points := &fakePointsRepo{}
 	logs := &fakeOperationLogRepo{}
-	svc := NewAdminSessionSvc(sessions, movies, halls, locks, orders, coupons, refunds, payments, logs)
+	svc := NewAdminSessionSvc(sessions, movies, halls, locks, orders, coupons, refunds, payments, points, logs)
 
 	if err := svc.Cancel(context.Background(), superAdminScope, 5); err != nil {
 		t.Fatalf("cancel session: %v", err)
@@ -293,6 +294,9 @@ func TestAdminSessionCancel(t *testing.T) {
 	}
 	if len(refunds.refunds) != 1 {
 		t.Fatal("expected refund created for paid order")
+	}
+	if len(points.reclaimed) != 1 {
+		t.Fatal("expected points reclaimed on refund")
 	}
 }
 

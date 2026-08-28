@@ -3,7 +3,6 @@ package handler
 import (
 	"net/http"
 
-	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/middleware"
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/resp"
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/service"
 	"github.com/gin-gonic/gin"
@@ -33,13 +32,8 @@ type createOrderResponse struct {
 
 // Create POST /api/v1/orders
 func (h *OrderHandler) Create(c *gin.Context) {
-	userIDAny, exists := c.Get(middleware.CtxUserID)
-	if !exists {
-		resp.Fail(c, http.StatusUnauthorized, "missing user")
-		return
-	}
-	userID, ok := userIDAny.(int64)
-	if !ok || userID <= 0 {
+	userID, ok := userIDFrom(c)
+	if !ok {
 		resp.Fail(c, http.StatusUnauthorized, "invalid user")
 		return
 	}
@@ -71,4 +65,19 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		PaidCents: order.PaidCents,
 		SeatNos:   seatNos,
 	})
+}
+
+// Get GET /api/v1/orders/:order_no（支付后轮询订单状态）
+func (h *OrderHandler) Get(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "invalid user")
+		return
+	}
+	order, err := h.orders.GetOrder(c.Request.Context(), userID, c.Param("order_no"))
+	if err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, order)
 }

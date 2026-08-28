@@ -183,3 +183,15 @@ func (s *OrderSvc) CreateOrder(ctx context.Context, in CreateOrderInput) (*domai
 	}
 	return order, nil
 }
+
+// GetOrder 查询订单详情（轮询用），校验归属。
+func (s *OrderSvc) GetOrder(ctx context.Context, userID int64, orderNo string) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByNo(ctx, orderNo)
+	if err != nil {
+		return nil, err
+	}
+	if order.UserID != userID {
+		return nil, domain.ErrForbidden
+	}
+	return order, nil
+}

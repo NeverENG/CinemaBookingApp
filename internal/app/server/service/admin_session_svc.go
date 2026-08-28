@@ -23,6 +23,7 @@ type AdminSessionSvc struct {
 	coupons  port.UserCouponRepo
 	refunds  port.RefundRepo
 	payments port.PaymentRepo
+	points   port.PointsRepo
 	logs     port.OperationLogRepo
 }
 
@@ -35,6 +36,7 @@ func NewAdminSessionSvc(
 	coupons port.UserCouponRepo,
 	refunds port.RefundRepo,
 	payments port.PaymentRepo,
+	points port.PointsRepo,
 	logs port.OperationLogRepo,
 ) *AdminSessionSvc {
 	return &AdminSessionSvc{
@@ -46,6 +48,7 @@ func NewAdminSessionSvc(
 		coupons:  coupons,
 		refunds:  refunds,
 		payments: payments,
+		points:   points,
 		logs:     logs,
 	}
 }
@@ -178,6 +181,9 @@ func (s *AdminSessionSvc) refundOrder(ctx context.Context, order domain.Order) e
 		ExternalRefundNo: uid.RefundNo(),
 	}
 	if err := s.refunds.Create(ctx, refund); err != nil {
+		return err
+	}
+	if err := s.points.ReclaimOnRefund(ctx, order.UserID, refund.AmountCents, refund.RefundNo); err != nil {
 		return err
 	}
 

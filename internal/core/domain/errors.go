@@ -36,4 +36,7 @@ var (
 
 	ErrForbidden      = errors.New("forbidden")
 	ErrRefundNotFound = errors.New("refund not found")
+
+	ErrBannerNotFound = errors.New("banner not found")
+	ErrBannerInvalid  = errors.New("banner invalid")
 )

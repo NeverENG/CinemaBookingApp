@@ -83,6 +83,18 @@ func (f *fakeSessionRepo) ListOverlapping(ctx context.Context, hallID int64, sta
 	return out, nil
 }
 
+func (f *fakeSessionRepo) ListByFilter(ctx context.Context, movieID, cinemaID int64) ([]domain.ShowSession, error) {
+	out := make([]domain.ShowSession, 0)
+	for _, s := range f.sessions {
+		if (movieID == 0 || s.MovieID == movieID) &&
+			(cinemaID == 0 || s.CinemaID == cinemaID) &&
+			(s.Status == domain.SessionOpen || s.Status == domain.SessionSoldOut) {
+			out = append(out, *s)
+		}
+	}
+	return out, nil
+}
+
 type fakeSeatRepo struct {
 	seats  map[int64]domain.Seat
 	synced [][]domain.Seat
@@ -126,6 +138,7 @@ type fakeSeatLockRepo struct {
 	locked   []domain.SeatLock
 	booked   []string
 	released []int64
+	active   []domain.SeatLock
 }
 
 func (f *fakeSeatLockRepo) CreateLocks(ctx context.Context, locks []domain.SeatLock) error {
@@ -148,6 +161,16 @@ func (f *fakeSeatLockRepo) ReleaseByOrderNo(ctx context.Context, orderNo string,
 func (f *fakeSeatLockRepo) ReleaseBySessionID(ctx context.Context, sessionID int64, status domain.SeatLockStatus) error {
 	f.released = append(f.released, sessionID)
 	return nil
+}
+
+func (f *fakeSeatLockRepo) ListActiveBySessionID(ctx context.Context, sessionID int64) ([]domain.SeatLock, error) {
+	out := make([]domain.SeatLock, 0)
+	for _, l := range f.active {
+		if l.SessionID == sessionID {
+			out = append(out, l)
+		}
+	}
+	return out, nil
 }
 
 type fakeCouponRepo struct {
@@ -267,6 +290,16 @@ func (f *fakeOrderRepo) ListPaidBySessionID(ctx context.Context, sessionID int64
 		}
 	}
 	return out, nil
+}
+
+func (f *fakeOrderRepo) CountPaidByMovieIDs(ctx context.Context, movieIDs []int64) (map[int64]int64, error) {
+	counts := make(map[int64]int64)
+	for _, o := range f.orders {
+		if o.Status == domain.OrderPaid {
+			counts[o.MovieID]++
+		}
+	}
+	return counts, nil
 }
 
 func (f *fakeOrderRepo) ListOrdersByUserID(ctx context.Context, userID int64) ([]domain.Order, error) {
@@ -416,5 +449,22 @@ func TestCreateOrderCouponBelongsToOtherUser(t *testing.T) {
 	})
 	if !errors.Is(err, domain.ErrCouponNotAvailable) {
 		t.Fatalf("expected ErrCouponNotAvailable, got %v", err)
+	}
+}
+
+func TestGetOrderOwnership(t *testing.T) {
+	users := &fakeUserRepo{users: map[int64]*domain.User{1: {ID: 1, Status: "ACTIVE"}}}
+	sessions := &fakeSessionRepo{}
+	seats := &fakeSeatRepo{}
+	orders := &fakeOrderRepo{orders: map[string]*domain.Order{
+		"O1": {OrderNo: "O1", UserID: 1, Status: domain.OrderPaid},
+	}}
+	svc := newTestOrderSvc(users, sessions, seats, &fakeSeatLockRepo{}, &fakeCouponRepo{}, orders)
+
+	if _, err := svc.GetOrder(context.Background(), 1, "O1"); err != nil {
+		t.Fatalf("owner query: %v", err)
+	}
+	if _, err := svc.GetOrder(context.Background(), 999, "O1"); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 }

@@ -10,12 +10,15 @@ import (
 )
 
 type userRow struct {
-	ID                int64  `gorm:"column:id;primaryKey"`
-	Username          string `gorm:"column:username"`
-	PasswordHash      string `gorm:"column:password_hash"`
-	Nickname          string `gorm:"column:nickname"`
-	MembershipLevelID int64  `gorm:"column:membership_level_id"`
-	Status            string `gorm:"column:status"`
+	ID                   int64  `gorm:"column:id;primaryKey"`
+	Username             string `gorm:"column:username"`
+	PasswordHash         string `gorm:"column:password_hash"`
+	Nickname             string `gorm:"column:nickname"`
+	MembershipLevelID    int64  `gorm:"column:membership_level_id"`
+	PointsBalance        int    `gorm:"column:points_balance"`
+	TotalEarnedPoints    int    `gorm:"column:total_earned_points"`
+	TotalReclaimedPoints int    `gorm:"column:total_reclaimed_points"`
+	Status               string `gorm:"column:status"`
 }
 
 func (userRow) TableName() string { return "users" }

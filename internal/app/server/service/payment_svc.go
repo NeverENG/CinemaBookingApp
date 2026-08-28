@@ -20,6 +20,7 @@ type PaymentSvc struct {
 	orders    port.OrderRepo
 	locks     port.SeatLockRepo
 	coupons   port.UserCouponRepo
+	points    port.PointsRepo
 }
 
 func NewPaymentSvc(
@@ -29,6 +30,7 @@ func NewPaymentSvc(
 	orders port.OrderRepo,
 	locks port.SeatLockRepo,
 	coupons port.UserCouponRepo,
+	points port.PointsRepo,
 ) *PaymentSvc {
 	return &PaymentSvc{
 		tx:        tx,
@@ -37,6 +39,7 @@ func NewPaymentSvc(
 		orders:    orders,
 		locks:     locks,
 		coupons:   coupons,
+		points:    points,
 	}
 }
 
@@ -168,6 +171,39 @@ func (s *PaymentSvc) HandleMockCallback(ctx context.Context, in MockCallbackInpu
 			return err
 		}
 
+		if err := s.points.GrantOnPaid(txCtx, order.UserID, order.PaidCents, order.OrderNo); err != nil {
+			return err
+		}
+
 		return s.callbacks.MarkProcessed(txCtx, cb.EventID)
 	})
+}
+
+// MockPay 模拟支付页确认：生成回调事件并走完整回调链路（幂等）。
+func (s *PaymentSvc) MockPay(ctx context.Context, userID int64, transactionNo string) error {
+	payment, err := s.payments.GetByTransactionNo(ctx, transactionNo)
+	if err != nil {
+		return err
+	}
+	if payment.UserID != userID {
+		return domain.ErrForbidden
+	}
+	return s.HandleMockCallback(ctx, MockCallbackInput{
+		EventID:       uid.EventID(),
+		TransactionNo: transactionNo,
+		AmountCents:   payment.AmountCents,
+		Payload:       "mock-pay",
+	})
+}
+
+// GetByOrder 查询订单支付信息（轮询用），校验归属。
+func (s *PaymentSvc) GetByOrder(ctx context.Context, userID int64, orderNo string) (*domain.PaymentTransaction, error) {
+	payment, err := s.payments.GetByOrderNo(ctx, orderNo)
+	if err != nil {
+		return nil, err
+	}
+	if payment.UserID != userID {
+		return nil, domain.ErrForbidden
+	}
+	return payment, nil
 }

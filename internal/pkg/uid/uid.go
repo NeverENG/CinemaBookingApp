@@ -31,6 +31,11 @@ func RefundNo() string {
 	return "RF" + time.Now().Format("20060102150405") + randHex(4)
 }
 
+// EventID 生成回调事件 ID（幂等键）。
+func EventID() string {
+	return "EV" + randHex(8)
+}
+
 func randHex(n int) string {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {

@@ -30,7 +30,9 @@ func Error(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrUserNotFound),
 		errors.Is(err, domain.ErrSessionNotFound),
 		errors.Is(err, domain.ErrOrderNotFound),
-		errors.Is(err, domain.ErrPaymentNotFound):
+		errors.Is(err, domain.ErrPaymentNotFound),
+		errors.Is(err, domain.ErrMovieNotFound),
+		errors.Is(err, domain.ErrHallNotFound):
 		Fail(c, http.StatusNotFound, err.Error())
 	case errors.Is(err, domain.ErrSeatNotAvailable),
 		errors.Is(err, domain.ErrSeatLockConflict),
@@ -38,8 +40,15 @@ func Error(c *gin.Context, err error) {
 		errors.Is(err, domain.ErrCouponNotAvailable),
 		errors.Is(err, domain.ErrInvalidTransition),
 		errors.Is(err, domain.ErrOrderExpired),
-		errors.Is(err, domain.ErrPaymentAmountMismatch):
+		errors.Is(err, domain.ErrPaymentAmountMismatch),
+		errors.Is(err, domain.ErrSessionTimeConflict),
+		errors.Is(err, domain.ErrSessionLockedForChange):
 		Fail(c, http.StatusConflict, err.Error())
+	case errors.Is(err, domain.ErrMovieInvalid),
+		errors.Is(err, domain.ErrHallInvalid),
+		errors.Is(err, domain.ErrSeatLayoutInvalid),
+		errors.Is(err, domain.ErrSessionInvalid):
+		Fail(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, domain.ErrInvalidCredentials):
 		Fail(c, http.StatusUnauthorized, err.Error())
 	default:

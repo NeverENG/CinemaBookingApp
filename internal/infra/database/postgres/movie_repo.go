@@ -11,17 +11,17 @@ import (
 )
 
 type movieRow struct {
-	ID              int64               `gorm:"column:id;primaryKey"`
-	Title           string              `gorm:"column:title"`
-	CoverURL        string              `gorm:"column:cover_url"`
-	TrailerURL      string              `gorm:"column:trailer_url"`
-	Description     string              `gorm:"column:description"`
-	DurationMinutes int                 `gorm:"column:duration_minutes"`
-	Genre           string              `gorm:"column:genre"`
-	ReleaseDate     time.Time           `gorm:"column:release_date"`
-	Rating          float64             `gorm:"column:rating"`
-	Status          domain.MovieStatus  `gorm:"column:status"`
-	CreatedAt       time.Time           `gorm:"column:created_at"`
+	ID              int64              `gorm:"column:id;primaryKey"`
+	Title           string             `gorm:"column:title"`
+	CoverURL        string             `gorm:"column:cover_url"`
+	TrailerURL      string             `gorm:"column:trailer_url"`
+	Description     string             `gorm:"column:description"`
+	DurationMinutes int                `gorm:"column:duration_minutes"`
+	Genre           string             `gorm:"column:genre"`
+	ReleaseDate     time.Time          `gorm:"column:release_date"`
+	Rating          float64            `gorm:"column:rating"`
+	Status          domain.MovieStatus `gorm:"column:status"`
+	CreatedAt       time.Time          `gorm:"column:created_at"`
 }
 
 func (movieRow) TableName() string { return "movies" }

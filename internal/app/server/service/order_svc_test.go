@@ -46,8 +46,46 @@ func (f *fakeSessionRepo) GetSessionByID(ctx context.Context, id int64) (*domain
 	return nil, domain.ErrSessionNotFound
 }
 
+func (f *fakeSessionRepo) Create(ctx context.Context, session *domain.ShowSession) error {
+	if f.sessions == nil {
+		f.sessions = make(map[int64]*domain.ShowSession)
+	}
+	session.ID = int64(len(f.sessions) + 1)
+	f.sessions[session.ID] = session
+	return nil
+}
+
+func (f *fakeSessionRepo) UpdatePrice(ctx context.Context, id int64, basePriceCents int64, priceRulesJSON string) error {
+	if s, ok := f.sessions[id]; ok {
+		s.BasePriceCents = basePriceCents
+		return nil
+	}
+	return domain.ErrSessionNotFound
+}
+
+func (f *fakeSessionRepo) Cancel(ctx context.Context, id int64) error {
+	if s, ok := f.sessions[id]; ok {
+		s.Status = domain.SessionCanceled
+		return nil
+	}
+	return domain.ErrSessionNotFound
+}
+
+func (f *fakeSessionRepo) ListOverlapping(ctx context.Context, hallID int64, start, end time.Time) ([]domain.ShowSession, error) {
+	out := make([]domain.ShowSession, 0)
+	for _, s := range f.sessions {
+		if s.HallID == hallID &&
+			s.Status != domain.SessionCanceled && s.Status != domain.SessionClosed &&
+			s.StartTime.Before(end) && s.EndTime.After(start) {
+			out = append(out, *s)
+		}
+	}
+	return out, nil
+}
+
 type fakeSeatRepo struct {
-	seats map[int64]domain.Seat
+	seats  map[int64]domain.Seat
+	synced [][]domain.Seat
 }
 
 func (f *fakeSeatRepo) ListSeatsByIDs(ctx context.Context, ids []int64) ([]domain.Seat, error) {
@@ -60,10 +98,34 @@ func (f *fakeSeatRepo) ListSeatsByIDs(ctx context.Context, ids []int64) ([]domai
 	return out, nil
 }
 
+func (f *fakeSeatRepo) ListByHallID(ctx context.Context, hallID int64) ([]domain.Seat, error) {
+	out := make([]domain.Seat, 0)
+	for _, s := range f.seats {
+		if s.HallID == hallID {
+			out = append(out, s)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeSeatRepo) SyncSeats(ctx context.Context, hallID int64, seats []domain.Seat) error {
+	f.synced = append(f.synced, seats)
+	if f.seats == nil {
+		f.seats = make(map[int64]domain.Seat)
+	}
+	for _, s := range seats {
+		s.ID = int64(len(f.seats) + 1)
+		s.HallID = hallID
+		f.seats[s.ID] = s
+	}
+	return nil
+}
+
 type fakeSeatLockRepo struct {
-	lockErr error
-	locked  []domain.SeatLock
-	booked  []string
+	lockErr  error
+	locked   []domain.SeatLock
+	booked   []string
+	released []int64
 }
 
 func (f *fakeSeatLockRepo) CreateLocks(ctx context.Context, locks []domain.SeatLock) error {
@@ -83,10 +145,16 @@ func (f *fakeSeatLockRepo) ReleaseByOrderNo(ctx context.Context, orderNo string,
 	return nil
 }
 
+func (f *fakeSeatLockRepo) ReleaseBySessionID(ctx context.Context, sessionID int64, status domain.SeatLockStatus) error {
+	f.released = append(f.released, sessionID)
+	return nil
+}
+
 type fakeCouponRepo struct {
 	coupons   map[string]*domain.UserCoupon
 	templates map[int64]*domain.CouponTemplate
 	lockErr   error
+	unlocked  []string
 }
 
 func (f *fakeCouponRepo) GetByCouponNo(ctx context.Context, couponNo string) (*domain.UserCoupon, error) {
@@ -116,7 +184,10 @@ func (f *fakeCouponRepo) LockForOrder(ctx context.Context, couponNo, orderNo str
 	return nil
 }
 
-func (f *fakeCouponRepo) UnlockByOrderNo(ctx context.Context, orderNo string) error { return nil }
+func (f *fakeCouponRepo) UnlockByOrderNo(ctx context.Context, orderNo string) error {
+	f.unlocked = append(f.unlocked, orderNo)
+	return nil
+}
 
 func (f *fakeCouponRepo) MarkUsedByOrderNo(ctx context.Context, orderNo string) error {
 	for _, c := range f.coupons {
@@ -168,6 +239,17 @@ func (f *fakeOrderRepo) IssueTickets(ctx context.Context, orderNo string, ticket
 		}
 	}
 	return nil
+}
+
+func (f *fakeOrderRepo) ExpirePendingBySessionID(ctx context.Context, sessionID int64) ([]string, error) {
+	var nos []string
+	for _, o := range f.orders {
+		if o.SessionID == sessionID && o.Status == domain.OrderPendingPayment {
+			o.Status = domain.OrderExpired
+			nos = append(nos, o.OrderNo)
+		}
+	}
+	return nos, nil
 }
 
 func (f *fakeOrderRepo) ListOrdersByUserID(ctx context.Context, userID int64) ([]domain.Order, error) {

@@ -24,10 +24,10 @@ var (
 	ErrRoleNotFound       = errors.New("role not found")
 	ErrInvalidCredentials = errors.New("invalid username or password")
 
-	ErrMovieNotFound  = errors.New("movie not found")
-	ErrMovieInvalid   = errors.New("movie invalid")
-	ErrHallNotFound   = errors.New("hall not found")
-	ErrHallInvalid    = errors.New("hall invalid")
+	ErrMovieNotFound     = errors.New("movie not found")
+	ErrMovieInvalid      = errors.New("movie invalid")
+	ErrHallNotFound      = errors.New("hall not found")
+	ErrHallInvalid       = errors.New("hall invalid")
 	ErrSeatLayoutInvalid = errors.New("seat layout invalid")
 
 	ErrSessionTimeConflict    = errors.New("session time conflict")

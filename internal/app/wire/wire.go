@@ -55,6 +55,9 @@ func NewApp() (*App, error) {
 	callbackRepo := postgres.NewPaymentCallbackRepo(pg)
 	adminRepo := postgres.NewAdminRepo(pg)
 	roleRepo := postgres.NewRoleRepo(pg)
+	movieRepo := postgres.NewMovieRepo(pg)
+	hallRepo := postgres.NewHallRepo(pg)
+	operationLogRepo := postgres.NewOperationLogRepo(pg)
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -69,11 +72,18 @@ func NewApp() (*App, error) {
 		log.Printf("ensure default admin: %v", err)
 	}
 
+	movieSvc := service.NewAdminMovieSvc(movieRepo, operationLogRepo)
+	hallSvc := service.NewAdminHallSvc(hallRepo, seatRepo, operationLogRepo)
+	sessionSvc := service.NewAdminSessionSvc(sessionRepo, movieRepo, hallRepo, seatLockRepo, orderRepo, couponRepo, operationLogRepo)
+
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
 	authHandler := handler.NewAuthHandler(authSvc)
+	movieHandler := handler.NewAdminMovieHandler(movieSvc)
+	hallHandler := handler.NewAdminHallHandler(hallSvc)
+	sessionHandler := handler.NewAdminSessionHandler(sessionSvc)
 	authMw := middleware.NewAuthMiddleware(tokens)
 
-	engine := router.New(orderHandler, paymentHandler, authHandler, authMw)
+	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler)
 	return &App{Engine: engine, DB: db, Addr: addr}, nil
 }

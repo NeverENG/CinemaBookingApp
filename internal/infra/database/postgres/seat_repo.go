@@ -67,8 +67,8 @@ func (r *SeatRepo) ListByHallID(ctx context.Context, hallID int64) ([]domain.Sea
 
 // SyncSeats 按布局 diff 同步：新增插入、变更更新、未出现的置 DISABLED（保留 ID 与历史）。
 func (r *SeatRepo) SyncSeats(ctx context.Context, hallID int64, seats []domain.Seat) error {
-	existing, err := r.ListByHallID(ctx, hallID)
-	if err != nil {
+	var existing []seatRow
+	if err := r.db.db(ctx).Where("hall_id = ?", hallID).Find(&existing).Error; err != nil {
 		return err
 	}
 	byNo := make(map[string]*seatRow, len(existing))

@@ -1,24 +1,32 @@
-.PHONY: run migrate test test-integration vet compose-up db-reset
+APP      := lterm
+DB_DSN   ?= host=localhost user=4ge0 dbname=cinema port=5432 sslmode=disable TimeZone=Asia/Shanghai
+TEST_DB  ?= host=localhost user=4ge0 dbname=cinema_test port=5432 sslmode=disable TimeZone=Asia/Shanghai
+
+.PHONY: run migrate build test test-integration fmt vet compose-up compose-down
 
 run:
-	go run ./cmd/lterm
+	DB_DSN="$(DB_DSN)" go run ./cmd/lterm
 
 migrate:
-	go run ./cmd/lterm -migrate
+	DB_DSN="$(DB_DSN)" go run ./cmd/lterm -migrate
+
+build:
+	go build -o bin/$(APP) ./cmd/lterm
 
 test:
 	go test ./...
 
 test-integration:
-	TEST_DB_DSN=$${TEST_DB_DSN:?set TEST_DB_DSN} go test ./internal/infra/database/postgres/ -run Integration -v
+	TEST_DB_DSN="$(TEST_DB)" go test ./internal/infra/database/postgres -v
+
+fmt:
+	gofmt -w ./cmd ./internal
 
 vet:
 	go vet ./...
 
 compose-up:
-	docker compose up --build
+	docker compose up -d --build
 
-db-reset:
-	dropdb --if-exists cinema
-	createdb cinema
-	go run ./cmd/lterm -migrate
+compose-down:
+	docker compose down

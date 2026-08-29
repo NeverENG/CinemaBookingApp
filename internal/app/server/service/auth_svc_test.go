@@ -65,12 +65,66 @@ func (f *fakeRoleRepo) Ensure(ctx context.Context, roles []domain.Role) error {
 }
 
 func newAuthTestSvc(users *fakeUserRepo, admins *fakeAdminRepo, roles *fakeRoleRepo) *AuthSvc {
-	return NewAuthSvc(users, admins, roles, jwt.New("test-secret", time.Hour), Bootstrap{
+	return NewAuthSvc(users, admins, roles, jwt.New("test-secret", time.Hour), &fakeLoginGuardRepo{}, Bootstrap{
 		AdminUsername: "admin",
 		AdminPassword: "admin123",
 		DemoUsername:  "demo",
 		DemoPassword:  "demo123",
 	}, &fakePasswordResetRepo{}, &fakeMembershipRepo{}, &fakeMailSender{}, false)
+}
+
+type fakeLoginGuardRepo struct {
+	guards map[string]*domain.LoginGuard
+}
+
+func (f *fakeLoginGuardRepo) key(scope, username string) string {
+	return scope + ":" + username
+}
+
+func (f *fakeLoginGuardRepo) Get(ctx context.Context, scope, username string) (*domain.LoginGuard, error) {
+	if f.guards == nil {
+		return nil, nil
+	}
+	return f.guards[f.key(scope, username)], nil
+}
+
+func (f *fakeLoginGuardRepo) RecordFailure(ctx context.Context, scope, username string) (int, error) {
+	if f.guards == nil {
+		f.guards = make(map[string]*domain.LoginGuard)
+	}
+	key := f.key(scope, username)
+	g := f.guards[key]
+	if g == nil {
+		g = &domain.LoginGuard{Scope: scope, Username: username}
+		f.guards[key] = g
+	}
+	g.FailedCount++
+	return g.FailedCount, nil
+}
+
+func (f *fakeLoginGuardRepo) Lock(ctx context.Context, scope, username string, until time.Time) error {
+	if f.guards == nil {
+		f.guards = make(map[string]*domain.LoginGuard)
+	}
+	key := f.key(scope, username)
+	g := f.guards[key]
+	if g == nil {
+		g = &domain.LoginGuard{Scope: scope, Username: username}
+		f.guards[key] = g
+	}
+	g.FailedCount = maxLoginFailures
+	g.LockedUntil = &until
+	return nil
+}
+
+func (f *fakeLoginGuardRepo) Reset(ctx context.Context, scope, username string) error {
+	if f.guards != nil {
+		if g := f.guards[f.key(scope, username)]; g != nil {
+			g.FailedCount = 0
+			g.LockedUntil = nil
+		}
+	}
+	return nil
 }
 
 type fakePasswordResetRepo struct {
@@ -255,7 +309,7 @@ func TestRequestAndResetPassword(t *testing.T) {
 	}}
 	resets := &fakePasswordResetRepo{}
 	sender := &fakeMailSender{}
-	svc := NewAuthSvc(users, &fakeAdminRepo{}, &fakeRoleRepo{}, jwt.New("test-secret", time.Hour), Bootstrap{
+	svc := NewAuthSvc(users, &fakeAdminRepo{}, &fakeRoleRepo{}, jwt.New("test-secret", time.Hour), &fakeLoginGuardRepo{}, Bootstrap{
 		AdminUsername: "admin", AdminPassword: "admin123", DemoUsername: "demo", DemoPassword: "demo123",
 	}, resets, &fakeMembershipRepo{}, sender, true)
 
@@ -281,7 +335,7 @@ func TestResetPasswordDevMode(t *testing.T) {
 		1: {ID: 1, Username: "alice@example.com", Email: "alice@example.com", PasswordHash: hash, Status: "ACTIVE"},
 	}}
 	resets := &fakePasswordResetRepo{}
-	svc := NewAuthSvc(users, &fakeAdminRepo{}, &fakeRoleRepo{}, jwt.New("test-secret", time.Hour), Bootstrap{
+	svc := NewAuthSvc(users, &fakeAdminRepo{}, &fakeRoleRepo{}, jwt.New("test-secret", time.Hour), &fakeLoginGuardRepo{}, Bootstrap{
 		AdminUsername: "admin", AdminPassword: "admin123", DemoUsername: "demo", DemoPassword: "demo123",
 	}, resets, &fakeMembershipRepo{}, &fakeMailSender{}, false)
 
@@ -297,5 +351,76 @@ func TestResetPasswordDevMode(t *testing.T) {
 	}
 	if !crypto.CheckPassword(users.users[1].PasswordHash, "new123") {
 		t.Fatal("password not reset")
+	}
+}
+
+func TestUserLoginLocked(t *testing.T) {
+	hash, _ := crypto.HashPassword("pass123")
+	users := &fakeUserRepo{users: map[int64]*domain.User{
+		1: {ID: 1, Username: "alice", PasswordHash: hash, Status: "ACTIVE"},
+	}}
+	guards := &fakeLoginGuardRepo{}
+	until := time.Now().Add(10 * time.Minute)
+	_ = guards.Lock(context.Background(), loginScopeUser, "alice", until)
+	svc := newAuthTestSvc(users, &fakeAdminRepo{}, &fakeRoleRepo{})
+	svc.guards = guards
+
+	_, _, err := svc.UserLogin(context.Background(), "alice", "pass123")
+	if !errors.Is(err, domain.ErrAccountLocked) {
+		t.Fatalf("expected ErrAccountLocked, got %v", err)
+	}
+}
+
+func TestUserLoginLockoutAfterFailures(t *testing.T) {
+	hash, _ := crypto.HashPassword("pass123")
+	users := &fakeUserRepo{users: map[int64]*domain.User{
+		1: {ID: 1, Username: "alice", PasswordHash: hash, Status: "ACTIVE"},
+	}}
+	guards := &fakeLoginGuardRepo{}
+	svc := NewAuthSvc(users, &fakeAdminRepo{}, &fakeRoleRepo{}, jwt.New("test-secret", time.Hour), guards, Bootstrap{
+		AdminUsername: "admin", AdminPassword: "admin123", DemoUsername: "demo", DemoPassword: "demo123",
+	}, &fakePasswordResetRepo{}, &fakeMembershipRepo{}, &fakeMailSender{}, false)
+
+	for i := 0; i < maxLoginFailures; i++ {
+		if _, _, err := svc.UserLogin(context.Background(), "alice", "wrong"); !errors.Is(err, domain.ErrInvalidCredentials) {
+			t.Fatalf("attempt %d: expected ErrInvalidCredentials, got %v", i+1, err)
+		}
+	}
+	g, err := guards.Get(context.Background(), loginScopeUser, "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g == nil || g.LockedUntil == nil || !time.Now().Before(*g.LockedUntil) {
+		t.Fatalf("expected account locked after %d failures", maxLoginFailures)
+	}
+
+	if _, _, err := svc.UserLogin(context.Background(), "alice", "pass123"); !errors.Is(err, domain.ErrAccountLocked) {
+		t.Fatalf("expected ErrAccountLocked for correct password, got %v", err)
+	}
+}
+
+func TestAdminLoginSuccessResetsGuard(t *testing.T) {
+	hash, _ := crypto.HashPassword("admin123")
+	admins := &fakeAdminRepo{admins: map[string]*domain.Admin{
+		"admin": {ID: 1, Username: "admin", PasswordHash: hash, RoleID: 1, Status: "ACTIVE"},
+	}}
+	roles := &fakeRoleRepo{roles: map[string]*domain.Role{
+		domain.RoleSuperAdmin: {ID: 1, Code: domain.RoleSuperAdmin, Name: "超级管理员"},
+	}}
+	guards := &fakeLoginGuardRepo{}
+	_, _ = guards.RecordFailure(context.Background(), loginScopeAdmin, "admin")
+	svc := NewAuthSvc(&fakeUserRepo{}, admins, roles, jwt.New("test-secret", time.Hour), guards, Bootstrap{
+		AdminUsername: "admin", AdminPassword: "admin123", DemoUsername: "demo", DemoPassword: "demo123",
+	}, &fakePasswordResetRepo{}, &fakeMembershipRepo{}, &fakeMailSender{}, false)
+
+	if _, _, err := svc.AdminLogin(context.Background(), "admin", "admin123"); err != nil {
+		t.Fatalf("admin login: %v", err)
+	}
+	g, err := guards.Get(context.Background(), loginScopeAdmin, "admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g == nil || g.FailedCount != 0 || g.LockedUntil != nil {
+		t.Fatalf("expected guard reset after success, got %+v", g)
 	}
 }

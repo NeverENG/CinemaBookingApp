@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: cinema
     ports:
-      - "5432:5432"
+      - "5433:5432" # 避免与本机 5432 的 Homebrew PostgreSQL 冲突
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -15,30 +15,23 @@ services:
       timeout: 3s
       retries: 10
 
-  app:
+  backend:
     build: .
-    environment:
-      DB_HOST: db
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: cinema
-      DB_SSLMODE: disable
-      HTTP_ADDR: ":8080"
-      JWT_SECRET: dev-secret
-      ADMIN_USERNAME: admin
-      ADMIN_PASSWORD: admin123
-      DEMO_USERNAME: demo
-      DEMO_PASSWORD: demo123
-      SMTP_HOST: smtp.qq.com
-      SMTP_PORT: "465"
-      SMTP_USER: ""
-      SMTP_PASSWORD: ""
-      SMTP_FROM: ""
-    ports:
-      - "8080:8080"
     depends_on:
       db:
         condition: service_healthy
+    environment:
+      DB_DSN: host=db user=postgres password=postgres dbname=cinema port=5432 sslmode=disable
+      HTTP_ADDR: :8080
+      GIN_MODE: ${GIN_MODE:-debug}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      DEMO_USERNAME: ${DEMO_USERNAME:-demo}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-demo123}
+    command: ["sh", "-c", "/app/lterm -migrate && /app/lterm"]
+    ports:
+      - "8080:8080"
 
 volumes:
   pgdata:

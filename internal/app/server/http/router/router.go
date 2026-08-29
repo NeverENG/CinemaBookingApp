@@ -25,8 +25,11 @@ func New(
 	changeHandler *handler.ChangeHandler,
 	healthHandler *handler.HealthHandler,
 	couponHandler *handler.AdminCouponHandler,
+	adminUserHandler *handler.AdminUserHandler,
 ) *gin.Engine {
 	r := gin.Default()
+	_ = r.SetTrustedProxies(nil) // 不信任代理头，去除 gin 默认警告
+	r.Use(middleware.CORS())
 	r.GET("/healthz", healthHandler.Check)
 	v1 := r.Group("/api/v1")
 	{
@@ -77,6 +80,7 @@ func New(
 			admin.GET("/coupons/templates", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), couponHandler.ListTemplates)
 			admin.PATCH("/coupons/templates/:id/status", authMw.Admin(domain.RoleSuperAdmin), couponHandler.SetTemplateStatus)
 			admin.POST("/coupons/issue", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), couponHandler.IssueToUser)
+			admin.POST("/admins", authMw.Admin(domain.RoleSuperAdmin), adminUserHandler.Create)
 
 			dashboard := admin.Group("/dashboard", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin, domain.RoleFinance))
 			dashboard.GET("/box-office", dashboardHandler.Trend)

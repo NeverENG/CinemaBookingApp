@@ -53,4 +53,5 @@ var (
 
 	ErrEmailNotRegistered = errors.New("email not registered")
 	ErrResetCodeInvalid   = errors.New("reset code invalid or expired")
+	ErrAccountLocked      = errors.New("account locked, try again later")
 )

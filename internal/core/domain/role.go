@@ -2,6 +2,7 @@ package domain
 
 // 角色编码。
 const (
+	RoleUser        = "USER"
 	RoleSuperAdmin  = "SUPER_ADMIN"
 	RoleCinemaAdmin = "CINEMA_ADMIN"
 	RoleFinance     = "FINANCE"

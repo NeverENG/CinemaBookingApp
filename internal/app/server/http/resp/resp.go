@@ -62,6 +62,8 @@ func Error(c *gin.Context, err error) {
 		Fail(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, domain.ErrInvalidCredentials):
 		Fail(c, http.StatusUnauthorized, err.Error())
+	case errors.Is(err, domain.ErrAccountLocked):
+		Fail(c, http.StatusLocked, err.Error())
 	case errors.Is(err, domain.ErrRefundNotFound):
 		Fail(c, http.StatusNotFound, err.Error())
 	case errors.Is(err, domain.ErrForbidden):

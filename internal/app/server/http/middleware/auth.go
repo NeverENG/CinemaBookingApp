@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/resp"
+	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
 	"github.com/NeverENG/CinemaBookingApp/internal/pkg/jwt"
 	"github.com/gin-gonic/gin"
 )
@@ -29,6 +30,11 @@ func (m *AuthMiddleware) User() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims, ok := m.parse(c)
 		if !ok {
+			return
+		}
+		if claims.Role != domain.RoleUser {
+			resp.Fail(c, http.StatusForbidden, "forbidden")
+			c.Abort()
 			return
 		}
 		c.Set(CtxUserID, claims.UserID)

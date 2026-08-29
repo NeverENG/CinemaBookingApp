@@ -67,14 +67,18 @@ func NewApp(cfg config.Config) (*App, error) {
 	boxOfficeRepo := postgres.NewBoxOfficeRepo(pg)
 	passwordResetRepo := postgres.NewPasswordResetRepo(pg)
 	membershipRepo := postgres.NewMembershipRepo(pg)
+	loginGuardRepo := postgres.NewLoginGuardRepo(pg)
 	mailerCfg := mailer.FromEnv()
 
 	tokens := jwt.New(cfg.JWTSecret, cfg.JWTExpire)
+	if cfg.JWTSecret == "dev-secret" {
+		log.Println("warning: JWT_SECRET uses dev-secret, set a strong secret in production")
+	}
 
 	orderSvc := service.NewOrderSvc(txm, userRepo, sessionRepo, seatRepo, seatLockRepo, couponRepo, orderRepo)
 	paymentSvc := service.NewPaymentSvc(txm, paymentRepo, callbackRepo, orderRepo, seatLockRepo, couponRepo, pointsRepo, boxOfficeRepo, membershipRepo)
 	authSvc := service.NewAuthSvc(
-		userRepo, adminRepo, roleRepo, tokens,
+		userRepo, adminRepo, roleRepo, tokens, loginGuardRepo,
 		service.Bootstrap{
 			AdminUsername: cfg.Admin.Username,
 			AdminPassword: cfg.Admin.Password,
@@ -101,6 +105,7 @@ func NewApp(cfg config.Config) (*App, error) {
 	boxOfficeSvc := service.NewBoxOfficeSvc(boxOfficeRepo)
 	changeSvc := service.NewChangeTicketSvc(orderRepo, sessionRepo, orderSvc, paymentSvc, refundSvc)
 	couponSvc := service.NewAdminCouponSvc(txm, couponRepo, userRepo, operationLogRepo)
+	adminUserSvc := service.NewAdminUserSvc(adminRepo, roleRepo, operationLogRepo)
 
 	orderHandler := handler.NewOrderHandler(orderSvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
@@ -117,9 +122,10 @@ func NewApp(cfg config.Config) (*App, error) {
 	changeHandler := handler.NewChangeHandler(changeSvc)
 	healthHandler := handler.NewHealthHandler(db)
 	couponHandler := handler.NewAdminCouponHandler(couponSvc)
+	adminUserHandler := handler.NewAdminUserHandler(adminUserSvc)
 	authMw := middleware.NewAuthMiddleware(tokens)
 
-	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler, refundHandler, dashboardHandler, changeHandler, healthHandler, couponHandler)
+	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler, refundHandler, dashboardHandler, changeHandler, healthHandler, couponHandler, adminUserHandler)
 
 	runner := job.NewRunner()
 	runner.Add("order_timeout", func(ctx context.Context) error {
@@ -173,7 +179,7 @@ func EnsureBootstrap(cfg config.Config) error {
 	roleRepo := postgres.NewRoleRepo(pg)
 	tokens := jwt.New(cfg.JWTSecret, cfg.JWTExpire)
 	authSvc := service.NewAuthSvc(
-		userRepo, adminRepo, roleRepo, tokens,
+		userRepo, adminRepo, roleRepo, tokens, postgres.NewLoginGuardRepo(pg),
 		service.Bootstrap{
 			AdminUsername: cfg.Admin.Username,
 			AdminPassword: cfg.Admin.Password,

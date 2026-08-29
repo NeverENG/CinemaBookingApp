@@ -11,6 +11,7 @@ import (
 type Config struct {
 	DB        DB
 	HTTPAddr  string
+	GINMode   string
 	JWTSecret string
 	JWTExpire time.Duration
 	Admin     Admin
@@ -53,6 +54,7 @@ func Load() Config {
 			TimeZone:    env("DB_TIMEZONE", "Asia/Shanghai"),
 		},
 		HTTPAddr:  env("HTTP_ADDR", ":8080"),
+		GINMode:   envGINMode(),
 		JWTSecret: env("JWT_SECRET", "dev-secret"),
 		JWTExpire: time.Duration(envInt("JWT_EXPIRE_HOURS", 24)) * time.Hour,
 		Admin: Admin{
@@ -101,4 +103,14 @@ func envInt(key string, def int) int {
 		return def
 	}
 	return n
+}
+
+func envGINMode() string {
+	mode := env("GIN_MODE", "debug")
+	switch mode {
+	case "debug", "release", "test":
+		return mode
+	default:
+		return "debug"
+	}
 }

@@ -16,12 +16,7 @@ const (
 	seatStatusEnabled = "ENABLED"
 )
 
-// OrderSvc 下单用例编排。
-// TODO(你): 按 docs/FSD/F0000 与状态机实现 CreateOrder：
-//
-//	tx.Run → 校验用户/场次/座位 → CreateLocks（DB 唯一索引兜底）
-//	→ biz.CalcOrderAmount → orders.CreateOrder(PENDING_PAYMENT)
-//	→ 用券则 coupons.LockForOrder → 返回订单
+// OrderSvc 下单用例编排：锁座 → 建单 → 锁券，一个用例一个事务。
 type OrderSvc struct {
 	tx       port.TxManager
 	users    port.UserRepo

@@ -14,7 +14,13 @@ import (
 	"github.com/NeverENG/CinemaBookingApp/internal/pkg/crypto"
 )
 
-const roleUser = "USER"
+const (
+	roleUser          = "USER"
+	loginScopeUser    = "USER"
+	loginScopeAdmin   = "ADMIN"
+	maxLoginFailures  = 5
+	loginLockDuration = 10 * time.Minute
+)
 
 // MailSender 邮件发送能力（由 pkg/mailer 实现）。
 type MailSender interface {
@@ -35,6 +41,7 @@ type AuthSvc struct {
 	admins      port.AdminRepo
 	roles       port.RoleRepo
 	tokens      port.TokenManager
+	guards      port.LoginGuardRepo
 	bootstrap   Bootstrap
 	resets      port.PasswordResetRepo
 	members     port.MembershipRepo
@@ -47,6 +54,7 @@ func NewAuthSvc(
 	admins port.AdminRepo,
 	roles port.RoleRepo,
 	tokens port.TokenManager,
+	guards port.LoginGuardRepo,
 	bootstrap Bootstrap,
 	resets port.PasswordResetRepo,
 	members port.MembershipRepo,
@@ -58,6 +66,7 @@ func NewAuthSvc(
 		admins:      admins,
 		roles:       roles,
 		tokens:      tokens,
+		guards:      guards,
 		bootstrap:   bootstrap,
 		resets:      resets,
 		members:     members,
@@ -67,13 +76,20 @@ func NewAuthSvc(
 }
 
 func (s *AuthSvc) UserLogin(ctx context.Context, username, password string) (string, *domain.User, error) {
-	user, err := s.users.GetByUsername(ctx, strings.ToLower(strings.TrimSpace(username)))
+	username = strings.ToLower(strings.TrimSpace(username))
+	if err := s.checkLoginLocked(ctx, loginScopeUser, username); err != nil {
+		return "", nil, err
+	}
+	user, err := s.users.GetByUsername(ctx, username)
 	if err != nil {
+		s.recordLoginFailure(ctx, loginScopeUser, username)
 		return "", nil, domain.ErrInvalidCredentials
 	}
 	if user.Status != "ACTIVE" || !crypto.CheckPassword(user.PasswordHash, password) {
+		s.recordLoginFailure(ctx, loginScopeUser, username)
 		return "", nil, domain.ErrInvalidCredentials
 	}
+	_ = s.guards.Reset(ctx, loginScopeUser, username)
 	token, err := s.tokens.Generate(user.ID, roleUser, nil)
 	if err != nil {
 		return "", nil, err
@@ -210,23 +226,52 @@ func generateResetCode() (string, error) {
 }
 
 func (s *AuthSvc) AdminLogin(ctx context.Context, username, password string) (string, *domain.Admin, error) {
+	username = strings.ToLower(strings.TrimSpace(username))
+	if err := s.checkLoginLocked(ctx, loginScopeAdmin, username); err != nil {
+		return "", nil, err
+	}
 	admin, err := s.admins.GetByUsername(ctx, username)
 	if err != nil {
+		s.recordLoginFailure(ctx, loginScopeAdmin, username)
 		return "", nil, domain.ErrInvalidCredentials
 	}
 	role, err := s.roles.GetByID(ctx, admin.RoleID)
 	if err != nil {
+		s.recordLoginFailure(ctx, loginScopeAdmin, username)
 		return "", nil, err
 	}
 	if admin.Status != "ACTIVE" || !crypto.CheckPassword(admin.PasswordHash, password) {
+		s.recordLoginFailure(ctx, loginScopeAdmin, username)
 		return "", nil, domain.ErrInvalidCredentials
 	}
+	_ = s.guards.Reset(ctx, loginScopeAdmin, username)
 	admin.RoleCode = role.Code
 	token, err := s.tokens.Generate(admin.ID, role.Code, admin.CinemaID)
 	if err != nil {
 		return "", nil, err
 	}
 	return token, admin, nil
+}
+
+func (s *AuthSvc) checkLoginLocked(ctx context.Context, scope, username string) error {
+	guard, err := s.guards.Get(ctx, scope, username)
+	if err != nil {
+		return err
+	}
+	if guard != nil && guard.LockedUntil != nil && time.Now().Before(*guard.LockedUntil) {
+		return domain.ErrAccountLocked
+	}
+	return nil
+}
+
+func (s *AuthSvc) recordLoginFailure(ctx context.Context, scope, username string) {
+	count, err := s.guards.RecordFailure(ctx, scope, username)
+	if err != nil {
+		return
+	}
+	if count >= maxLoginFailures {
+		_ = s.guards.Lock(ctx, scope, username, time.Now().Add(loginLockDuration))
+	}
 }
 
 // EnsureDefaultAdmin 开发引导：无管理员时创建配置里的默认管理员。

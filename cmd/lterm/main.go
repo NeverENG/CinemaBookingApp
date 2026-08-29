@@ -9,6 +9,7 @@ import (
 	"github.com/NeverENG/CinemaBookingApp/internal/app/wire"
 	"github.com/NeverENG/CinemaBookingApp/internal/infra/config"
 	"github.com/NeverENG/CinemaBookingApp/internal/infra/database/postgres"
+	"github.com/gin-gonic/gin"
 )
 
 // main 只做入口：解析参数 → 组装（wire）→ 启动。
@@ -35,6 +36,7 @@ func main() {
 		return
 	}
 
+	gin.SetMode(cfg.GINMode)
 	app, err := wire.NewApp(cfg)
 	if err != nil {
 		log.Fatalf("init app: %v", err)

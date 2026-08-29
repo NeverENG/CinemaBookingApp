@@ -1,3 +1,6 @@
 .idea
+.env
+/bin/
+/lterm
 frontend/node_modules/
 frontend/dist/

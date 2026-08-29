@@ -1,37 +1,98 @@
+x-backend-image: &backend-image
+  image: ${BACKEND_IMAGE:-lterm-backend:local}
+  build:
+    context: .
+    dockerfile: Dockerfile
+
+x-backend-environment: &backend-environment
+  DB_HOST: db
+  DB_PORT: "5432"
+  DB_USER: ${POSTGRES_USER:-postgres}
+  DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  DB_NAME: ${POSTGRES_DB:-cinema}
+  DB_SSLMODE: disable
+  DB_TIMEZONE: Asia/Shanghai
+  HTTP_ADDR: ":8080"
+  GIN_MODE: ${GIN_MODE:-release}
+  JWT_SECRET: ${JWT_SECRET:-change-this-demo-secret}
+  JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-24}
+  ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+  DEMO_USERNAME: ${DEMO_USERNAME:-demo}
+  DEMO_PASSWORD: ${DEMO_PASSWORD:-demo123}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-}
+
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: cinema
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-cinema}
+      TZ: Asia/Shanghai
     ports:
-      - "5433:5432" # 避免与本机 5432 的 Homebrew PostgreSQL 冲突
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d cinema"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 3s
       timeout: 3s
-      retries: 10
+      retries: 20
+      start_period: 5s
 
-  backend:
-    build: .
+  migrate:
+    <<: *backend-image
+    restart: "no"
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DB_DSN: host=db user=postgres password=postgres dbname=cinema port=5432 sslmode=disable
-      HTTP_ADDR: :8080
-      GIN_MODE: ${GIN_MODE:-debug}
-      JWT_SECRET: ${JWT_SECRET:-dev-secret}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
-      DEMO_USERNAME: ${DEMO_USERNAME:-demo}
-      DEMO_PASSWORD: ${DEMO_PASSWORD:-demo123}
-    command: ["sh", "-c", "/app/lterm -migrate && /app/lterm"]
+      <<: *backend-environment
+    command: ["-migrate", "-seed"]
+
+  backend:
+    <<: *backend-image
+    restart: unless-stopped
+    stop_grace_period: 25s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *backend-environment
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/healthz >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-lterm-frontend:local}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
     ports:
-      - "8080:8080"
+      - "${APP_PORT:-8088}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/ >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
 volumes:
   pgdata:

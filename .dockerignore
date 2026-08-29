@@ -3,6 +3,9 @@
 .DS_Store
 bin
 docs
+frontend/node_modules
+frontend/dist
+lterm
 *.md
 *.key
 *.lic

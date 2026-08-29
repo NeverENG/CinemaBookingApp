@@ -151,3 +151,10 @@ SELECT stat_date, cinema_id, movie_id,
        SUM(gross_delta) - SUM(refund_delta), now()
 FROM box_office_ledger
 GROUP BY stat_date, cinema_id, movie_id;
+
+-- 显式主键 Seed 后同步序列，避免后台继续新增数据时主键冲突。
+SELECT setval(pg_get_serial_sequence('cinemas', 'id'), COALESCE((SELECT MAX(id) FROM cinemas), 1), true);
+SELECT setval(pg_get_serial_sequence('movies', 'id'), COALESCE((SELECT MAX(id) FROM movies), 1), true);
+SELECT setval(pg_get_serial_sequence('halls', 'id'), COALESCE((SELECT MAX(id) FROM halls), 1), true);
+SELECT setval(pg_get_serial_sequence('seats', 'id'), COALESCE((SELECT MAX(id) FROM seats), 1), true);
+SELECT setval(pg_get_serial_sequence('show_sessions', 'id'), COALESCE((SELECT MAX(id) FROM show_sessions), 1), true);

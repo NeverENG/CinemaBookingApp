@@ -27,12 +27,17 @@ type BannerView struct {
 }
 
 type HotMovieView struct {
-	MovieID  int64   `json:"movie_id"`
-	Title    string  `json:"title"`
-	CoverURL string  `json:"cover_url"`
-	Trailer  string  `json:"trailer_url"`
-	Rating   float64 `json:"rating"`
-	Sold     int64   `json:"sold_count"`
+	MovieID         int64              `json:"movie_id"`
+	Title           string             `json:"title"`
+	CoverURL        string             `json:"cover_url"`
+	Trailer         string             `json:"trailer_url"`
+	Description     string             `json:"description"`
+	DurationMinutes int                `json:"duration_minutes"`
+	Genre           string             `json:"genre"`
+	ReleaseDate     time.Time          `json:"release_date"`
+	Rating          float64            `json:"rating"`
+	Sold            int64              `json:"sold_count"`
+	Status          domain.MovieStatus `json:"status"`
 }
 
 type HomeView struct {
@@ -73,12 +78,17 @@ func (s *HomeSvc) GetHome(ctx context.Context) (*HomeView, error) {
 		heat := float64(sold[m.ID])*0.7 + m.Rating*10
 		scoredList = append(scoredList, scored{
 			view: HotMovieView{
-				MovieID:  m.ID,
-				Title:    m.Title,
-				CoverURL: m.CoverURL,
-				Trailer:  m.TrailerURL,
-				Rating:   m.Rating,
-				Sold:     sold[m.ID],
+				MovieID:         m.ID,
+				Title:           m.Title,
+				CoverURL:        m.CoverURL,
+				Trailer:         m.TrailerURL,
+				Description:     m.Description,
+				DurationMinutes: m.DurationMinutes,
+				Genre:           m.Genre,
+				ReleaseDate:     m.ReleaseDate,
+				Rating:          m.Rating,
+				Sold:            sold[m.ID],
+				Status:          m.Status,
 			},
 			heat: heat,
 		})

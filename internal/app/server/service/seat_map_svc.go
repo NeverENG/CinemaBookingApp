@@ -15,6 +15,7 @@ type SeatMapSvc struct {
 	locks    port.SeatLockRepo
 	movies   port.MovieRepo
 	halls    port.HallRepo
+	cinemas  port.CinemaRepo
 }
 
 func NewSeatMapSvc(
@@ -23,17 +24,28 @@ func NewSeatMapSvc(
 	locks port.SeatLockRepo,
 	movies port.MovieRepo,
 	halls port.HallRepo,
+	cinemas ...port.CinemaRepo,
 ) *SeatMapSvc {
-	return &SeatMapSvc{sessions: sessions, seats: seats, locks: locks, movies: movies, halls: halls}
+	var cinemaRepo port.CinemaRepo
+	if len(cinemas) > 0 {
+		cinemaRepo = cinemas[0]
+	}
+	return &SeatMapSvc{sessions: sessions, seats: seats, locks: locks, movies: movies, halls: halls, cinemas: cinemaRepo}
 }
 
 type SessionView struct {
-	ID             int64     `json:"id"`
-	MovieTitle     string    `json:"movie_title"`
-	HallName       string    `json:"hall_name"`
-	StartTime      time.Time `json:"start_time"`
-	EndTime        time.Time `json:"end_time"`
-	BasePriceCents int64     `json:"base_price_cents"`
+	ID             int64                `json:"id"`
+	MovieID        int64                `json:"movie_id"`
+	MovieTitle     string               `json:"movie_title"`
+	CinemaID       int64                `json:"cinema_id"`
+	CinemaName     string               `json:"cinema_name"`
+	HallID         int64                `json:"hall_id"`
+	HallName       string               `json:"hall_name"`
+	StartTime      time.Time            `json:"start_time"`
+	EndTime        time.Time            `json:"end_time"`
+	BasePriceCents int64                `json:"base_price_cents"`
+	Status         domain.SessionStatus `json:"status"`
+	RemainingSeats int                  `json:"remaining_seats"`
 }
 
 type SeatView struct {
@@ -86,6 +98,7 @@ func (s *SeatMapSvc) GetSeatMap(ctx context.Context, sessionID int64) (*SeatMapV
 	}
 
 	seatViews := make([]SeatView, 0, len(seats))
+	remainingSeats := 0
 	for _, seat := range seats {
 		status := "available"
 		switch {
@@ -96,6 +109,9 @@ func (s *SeatMapSvc) GetSeatMap(ctx context.Context, sessionID int64) (*SeatMapV
 		case occupied[seat.ID] == "locked":
 			status = "locked"
 		}
+		if status == "available" && seat.Status == domain.SeatEnabled {
+			remainingSeats++
+		}
 		seatViews = append(seatViews, SeatView{
 			SeatID: seat.ID,
 			RowNo:  seat.RowNo,
@@ -105,6 +121,7 @@ func (s *SeatMapSvc) GetSeatMap(ctx context.Context, sessionID int64) (*SeatMapV
 			Status: status,
 		})
 	}
+	view.RemainingSeats = remainingSeats
 	return &SeatMapView{Session: *view, Seats: seatViews, ServerTime: now}, nil
 }
 
@@ -116,6 +133,10 @@ func (s *SeatMapSvc) ListSessions(ctx context.Context, movieID, cinemaID int64) 
 	views := make([]SessionView, 0, len(sessions))
 	for i := range sessions {
 		v, err := s.sessionView(ctx, &sessions[i])
+		if err != nil {
+			return nil, err
+		}
+		v.RemainingSeats, err = s.remainingSeats(ctx, sessions[i].ID, sessions[i].HallID)
 		if err != nil {
 			return nil, err
 		}
@@ -133,12 +154,52 @@ func (s *SeatMapSvc) sessionView(ctx context.Context, session *domain.ShowSessio
 	if err != nil {
 		return nil, err
 	}
+	cinemaName := ""
+	if s.cinemas != nil {
+		cinema, err := s.cinemas.GetByID(ctx, session.CinemaID)
+		if err != nil {
+			return nil, err
+		}
+		cinemaName = cinema.Name
+	}
 	return &SessionView{
 		ID:             session.ID,
+		MovieID:        session.MovieID,
 		MovieTitle:     movie.Title,
+		CinemaID:       session.CinemaID,
+		CinemaName:     cinemaName,
+		HallID:         session.HallID,
 		HallName:       hall.Name,
 		StartTime:      session.StartTime,
 		EndTime:        session.EndTime,
 		BasePriceCents: session.BasePriceCents,
+		Status:         session.Status,
 	}, nil
+}
+
+func (s *SeatMapSvc) remainingSeats(ctx context.Context, sessionID, hallID int64) (int, error) {
+	seats, err := s.seats.ListByHallID(ctx, hallID)
+	if err != nil {
+		return 0, err
+	}
+	locks, err := s.locks.ListActiveBySessionID(ctx, sessionID)
+	if err != nil {
+		return 0, err
+	}
+	now := time.Now()
+	occupied := make(map[int64]struct{}, len(locks))
+	for _, lock := range locks {
+		if lock.Status == domain.SeatLockBooked || (lock.Status == domain.SeatLockLocked && lock.ExpiresAt.After(now)) {
+			occupied[lock.SeatID] = struct{}{}
+		}
+	}
+	remaining := 0
+	for _, seat := range seats {
+		if seat.Status == domain.SeatEnabled {
+			if _, ok := occupied[seat.ID]; !ok {
+				remaining++
+			}
+		}
+	}
+	return remaining, nil
 }

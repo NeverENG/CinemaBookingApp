@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/resp"
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/service"
@@ -23,9 +24,21 @@ type createPaymentRequest struct {
 
 type createPaymentResponse struct {
 	TransactionNo   string `json:"transaction_no"`
+	OrderNo         string `json:"order_no"`
 	AmountCents     int64  `json:"amount_cents"`
 	Channel         string `json:"channel"`
+	Status          string `json:"status"`
 	MockCallbackURL string `json:"mock_callback_url"`
+}
+
+type paymentStatusResponse struct {
+	TransactionNo string     `json:"transaction_no"`
+	OrderNo       string     `json:"order_no"`
+	AmountCents   int64      `json:"amount_cents"`
+	Channel       string     `json:"channel"`
+	Status        string     `json:"status"`
+	PaidAt        *time.Time `json:"paid_at"`
+	ClosedAt      *time.Time `json:"closed_at"`
 }
 
 // Create POST /api/v1/payments
@@ -42,8 +55,10 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 	}
 	resp.OK(c, createPaymentResponse{
 		TransactionNo:   payment.TransactionNo,
+		OrderNo:         payment.OrderNo,
 		AmountCents:     payment.AmountCents,
 		Channel:         payment.Channel,
+		Status:          string(payment.Status),
 		MockCallbackURL: "/api/v1/payments/mock-callback",
 	})
 }
@@ -111,5 +126,13 @@ func (h *PaymentHandler) GetByOrder(c *gin.Context) {
 		resp.Error(c, err)
 		return
 	}
-	resp.OK(c, payment)
+	resp.OK(c, paymentStatusResponse{
+		TransactionNo: payment.TransactionNo,
+		OrderNo:       payment.OrderNo,
+		AmountCents:   payment.AmountCents,
+		Channel:       payment.Channel,
+		Status:        string(payment.Status),
+		PaidAt:        payment.PaidAt,
+		ClosedAt:      payment.ClosedAt,
+	})
 }

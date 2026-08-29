@@ -2,8 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/app/wire"
@@ -22,6 +27,9 @@ func main() {
 		db, err := wire.OpenDB(cfg)
 		if err != nil {
 			log.Fatalf("open db: %v", err)
+		}
+		if sqlDB, err := db.DB(); err == nil {
+			defer sqlDB.Close()
 		}
 		if err := postgres.ApplyAllMigrations(db, "sql/migrations"); err != nil {
 			log.Fatalf("migrate: %v", err)
@@ -42,11 +50,63 @@ func main() {
 		log.Fatalf("init app: %v", err)
 	}
 
+	server := &http.Server{
+		Addr:              app.Addr,
+		Handler:           app.Engine,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
 	log.Printf("listening on %s", app.Addr)
 	jobCtx, cancelJobs := context.WithCancel(context.Background())
-	defer cancelJobs()
-	go app.Jobs.RunPeriodically(jobCtx, time.Minute)
-	if err := app.Engine.Run(app.Addr); err != nil {
-		log.Fatalf("server: %v", err)
+	jobDone := make(chan struct{})
+	go func() {
+		defer close(jobDone)
+		app.Jobs.RunPeriodically(jobCtx, time.Minute)
+	}()
+
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- server.ListenAndServe()
+	}()
+
+	signalCtx, stopSignal := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopSignal()
+
+	select {
+	case <-signalCtx.Done():
+		log.Println("shutdown signal received")
+	case err := <-serverErr:
+		if !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("server stopped: %v", err)
+		}
+	}
+
+	cancelJobs()
+
+	serverShutdownCtx, cancelServerShutdown := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := server.Shutdown(serverShutdownCtx); err != nil {
+		log.Printf("graceful server shutdown failed: %v", err)
+		_ = server.Close()
+	}
+	cancelServerShutdown()
+
+	jobShutdownCtx, cancelJobShutdown := context.WithTimeout(context.Background(), 10*time.Second)
+	select {
+	case <-jobDone:
+	case <-jobShutdownCtx.Done():
+		log.Printf("job shutdown timed out: %v", jobShutdownCtx.Err())
+	}
+	cancelJobShutdown()
+
+	select {
+	case <-jobDone:
+		if err := app.Close(); err != nil {
+			log.Printf("database close failed: %v", err)
+		}
+	default:
+		log.Println("database close skipped because jobs are still running")
 	}
 }

@@ -70,7 +70,7 @@ func (r *PaymentRepo) ListPendingOlderThan(ctx context.Context, before time.Time
 	var rows []paymentRow
 	if err := r.db.db(ctx).
 		Where("status = ? AND created_at < ?", domain.PaymentPending, before).
-		Order("id").
+		Order("created_at, transaction_no").
 		Limit(limit).
 		Find(&rows).Error; err != nil {
 		return nil, err

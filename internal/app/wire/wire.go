@@ -28,6 +28,18 @@ type App struct {
 	Jobs   *job.Runner
 }
 
+// Close 关闭应用持有的数据库连接池。
+func (a *App) Close() error {
+	if a == nil || a.DB == nil {
+		return nil
+	}
+	sqlDB, err := a.DB.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
+}
+
 // OpenDB 按配置打开数据库连接。
 func OpenDB(cfg config.Config) (*gorm.DB, error) {
 	db, err := gorm.Open(pgdriver.Open(cfg.DB.DSN()), &gorm.Config{})
@@ -59,6 +71,7 @@ func NewApp(cfg config.Config) (*App, error) {
 	adminRepo := postgres.NewAdminRepo(pg)
 	roleRepo := postgres.NewRoleRepo(pg)
 	movieRepo := postgres.NewMovieRepo(pg)
+	cinemaRepo := postgres.NewCinemaRepo(pg)
 	hallRepo := postgres.NewHallRepo(pg)
 	operationLogRepo := postgres.NewOperationLogRepo(pg)
 	refundRepo := postgres.NewRefundRepo(pg)
@@ -97,7 +110,9 @@ func NewApp(cfg config.Config) (*App, error) {
 	movieSvc := service.NewAdminMovieSvc(movieRepo, operationLogRepo)
 	hallSvc := service.NewAdminHallSvc(hallRepo, seatRepo, operationLogRepo)
 	sessionSvc := service.NewAdminSessionSvc(sessionRepo, movieRepo, hallRepo, seatLockRepo, orderRepo, couponRepo, refundRepo, paymentRepo, pointsRepo, boxOfficeRepo, operationLogRepo)
-	seatMapSvc := service.NewSeatMapSvc(sessionRepo, seatRepo, seatLockRepo, movieRepo, hallRepo)
+	seatMapSvc := service.NewSeatMapSvc(sessionRepo, seatRepo, seatLockRepo, movieRepo, hallRepo, cinemaRepo)
+	catalogSvc := service.NewCatalogSvc(movieRepo, cinemaRepo, orderRepo)
+	orderQuerySvc := service.NewOrderQuerySvc(orderRepo, sessionRepo, movieRepo, hallRepo, cinemaRepo)
 	homeSvc := service.NewHomeSvc(bannerRepo, movieRepo, orderRepo)
 	bannerSvc := service.NewAdminBannerSvc(bannerRepo, operationLogRepo)
 	pointsSvc := service.NewPointsSvc(txm, pointsRepo, couponRepo)
@@ -107,7 +122,7 @@ func NewApp(cfg config.Config) (*App, error) {
 	couponSvc := service.NewAdminCouponSvc(txm, couponRepo, userRepo, operationLogRepo)
 	adminUserSvc := service.NewAdminUserSvc(adminRepo, roleRepo, operationLogRepo)
 
-	orderHandler := handler.NewOrderHandler(orderSvc)
+	orderHandler := handler.NewOrderHandler(orderSvc, orderQuerySvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
 	authHandler := handler.NewAuthHandler(authSvc)
 	movieHandler := handler.NewAdminMovieHandler(movieSvc)
@@ -123,9 +138,10 @@ func NewApp(cfg config.Config) (*App, error) {
 	healthHandler := handler.NewHealthHandler(db)
 	couponHandler := handler.NewAdminCouponHandler(couponSvc)
 	adminUserHandler := handler.NewAdminUserHandler(adminUserSvc)
+	catalogHandler := handler.NewCatalogHandler(catalogSvc)
 	authMw := middleware.NewAuthMiddleware(tokens)
 
-	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler, refundHandler, dashboardHandler, changeHandler, healthHandler, couponHandler, adminUserHandler)
+	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler, refundHandler, dashboardHandler, changeHandler, healthHandler, couponHandler, adminUserHandler, catalogHandler)
 
 	runner := job.NewRunner()
 	runner.Add("order_timeout", func(ctx context.Context) error {
@@ -172,6 +188,9 @@ func EnsureBootstrap(cfg config.Config) error {
 	db, err := OpenDB(cfg)
 	if err != nil {
 		return err
+	}
+	if sqlDB, err := db.DB(); err == nil {
+		defer sqlDB.Close()
 	}
 	pg := postgres.NewDB(db)
 	userRepo := postgres.NewUserRepo(pg)

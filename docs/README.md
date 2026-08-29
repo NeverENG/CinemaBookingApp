@@ -20,6 +20,8 @@
 | 蓝图 | [guide/LTerm后端结构蓝图.md](guide/LTerm后端结构蓝图.md) | 对齐 potentia/backend：core/domain + core/port + infra + app/server | v0.2 |
 | 设计 | [design/00-设计总览.md](design/00-设计总览.md) | 剩余五模块设计：管理员/选座/退改签/积分/看板 | v0.1 |
 | 设计 | [design/06-首页推荐与内容资源设计.md](design/06-首页推荐与内容资源设计.md) | 首页推荐、外部视频URL、颜色头像、附近影院 | v0.1 |
+| 设计 | [design/07-前端UIUX与架构.md](design/07-前端UIUX与架构.md) | 胶片灰/影院红用户端、深灰管理端、Router、Axios、Server Hook | 已确认基线 v0.3 |
+| 设计 | [design/08-电影视觉素材清单.md](design/08-电影视觉素材清单.md) | Hero Banner、电影海报、影院素材与版权接入规格 | v0.1 |
 
 ## 协作约定
 
@@ -32,5 +34,5 @@
 
 - 文档模板规则：`rules/prd-format.md`、`rules/brd-format.md`、`rules/mrd-format.md`
 - 角色设定：`rules/role.md`（产品架构师 Tyrion）
-- 视觉规范：`rules/design-system.md`（黑金高级简约）
+- 视觉规范：`rules/design-system.md`（用户端胶片灰/影院红、管理端深灰控制台）
 - 需求原始草稿：`PRD/需求原始草稿.md`

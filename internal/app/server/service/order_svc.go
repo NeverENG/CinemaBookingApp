@@ -196,6 +196,10 @@ func (s *OrderSvc) GetOrder(ctx context.Context, userID int64, orderNo string) (
 	return order, nil
 }
 
+func (s *OrderSvc) ListOrders(ctx context.Context, userID int64) ([]domain.Order, error) {
+	return s.orders.ListOrdersByUserID(ctx, userID)
+}
+
 // ExpireOverdueOrders 定时任务：过期待支付订单 → EXPIRED，释放锁、解锁券。
 func (s *OrderSvc) ExpireOverdueOrders(ctx context.Context, now time.Time) (int, error) {
 	expired, err := s.orders.ListExpiredPending(ctx, now)

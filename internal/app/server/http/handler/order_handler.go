@@ -11,10 +11,15 @@ import (
 // OrderHandler 订单 HTTP 层：只做参数绑定、鉴权、错误映射。
 type OrderHandler struct {
 	orders *service.OrderSvc
+	views  *service.OrderQuerySvc
 }
 
-func NewOrderHandler(orders *service.OrderSvc) *OrderHandler {
-	return &OrderHandler{orders: orders}
+func NewOrderHandler(orders *service.OrderSvc, views ...*service.OrderQuerySvc) *OrderHandler {
+	var query *service.OrderQuerySvc
+	if len(views) > 0 {
+		query = views[0]
+	}
+	return &OrderHandler{orders: orders, views: query}
 }
 
 type createOrderRequest struct {
@@ -74,10 +79,39 @@ func (h *OrderHandler) Get(c *gin.Context) {
 		resp.Fail(c, http.StatusUnauthorized, "invalid user")
 		return
 	}
-	order, err := h.orders.GetOrder(c.Request.Context(), userID, c.Param("order_no"))
+	var order any
+	var err error
+	if h.views != nil {
+		order, err = h.views.Get(c.Request.Context(), userID, c.Param("order_no"))
+	} else {
+		order, err = h.orders.GetOrder(c.Request.Context(), userID, c.Param("order_no"))
+	}
 	if err != nil {
 		resp.Error(c, err)
 		return
 	}
 	resp.OK(c, order)
+}
+
+func (h *OrderHandler) List(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "invalid user")
+		return
+	}
+	if h.views != nil {
+		orders, err := h.views.List(c.Request.Context(), userID)
+		if err != nil {
+			resp.Error(c, err)
+			return
+		}
+		resp.OK(c, orders)
+		return
+	}
+	orders, err := h.orders.ListOrders(c.Request.Context(), userID)
+	if err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, orders)
 }

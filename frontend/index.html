@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f5f6" />
+    <meta name="description" content="LTerm 电影院订票系统" />
+    <title>LTerm · 影院热映</title>
+  </head>
+  <body>
+    <div id="root">
+      <div class="boot-screen">
+        <div class="boot-mark">LT</div>
+        <strong>LTerm 前端</strong>
+        <p>请通过 Vite 启动前端，不要直接双击打开此 HTML 文件。</p>
+        <code>cd frontend &amp;&amp; npm install &amp;&amp; npm run dev</code>
+      </div>
+    </div>
+    <style>
+      .boot-screen { min-height: 100vh; display: grid; place-content: center; gap: 12px; padding: 32px; color: #202124; background: #f4f5f6; font-family: system-ui, sans-serif; text-align: center; }
+      .boot-mark { width: 42px; height: 42px; display: grid; place-items: center; margin: 0 auto; border: 1px solid #df5960; border-radius: 50%; color: #df5960; font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+      .boot-screen strong { font-size: 20px; }
+      .boot-screen p { margin: 0; color: #77736b; font-size: 13px; }
+      .boot-screen code { padding: 10px 12px; border: 1px solid #e2e5e8; border-radius: 8px; color: #6d7278; background: #ffffff; font-size: 12px; }
+    </style>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

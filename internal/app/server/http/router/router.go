@@ -1,6 +1,8 @@
 package router
 
 import (
+	"time"
+
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/handler"
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/middleware"
 	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
@@ -26,12 +28,14 @@ func New(
 	healthHandler *handler.HealthHandler,
 	couponHandler *handler.AdminCouponHandler,
 	adminUserHandler *handler.AdminUserHandler,
+	catalogHandler *handler.CatalogHandler,
 ) *gin.Engine {
 	r := gin.Default()
 	_ = r.SetTrustedProxies(nil) // 不信任代理头，去除 gin 默认警告
 	r.Use(middleware.CORS())
 	r.GET("/healthz", healthHandler.Check)
 	v1 := r.Group("/api/v1")
+	v1.Use(middleware.RateLimit(middleware.NewTokenBucketLimiter(20, 40, 10*time.Minute), middleware.ClientIPKey))
 	{
 		v1.POST("/auth/login", authHandler.UserLogin)
 		v1.POST("/auth/register", authHandler.Register)
@@ -42,6 +46,10 @@ func New(
 		v1.GET("/sessions", userSessionHandler.List)
 		v1.GET("/sessions/:id/seats", userSessionHandler.GetSeatMap)
 		v1.GET("/home", homeHandler.Get)
+		v1.GET("/movies", catalogHandler.ListMovies)
+		v1.GET("/movies/:id", catalogHandler.GetMovie)
+		v1.GET("/cinemas", catalogHandler.ListCinemas)
+		v1.GET("/orders", authMw.User(), orderHandler.List)
 		v1.POST("/orders", authMw.User(), orderHandler.Create)
 		v1.GET("/orders/:order_no", authMw.User(), orderHandler.Get)
 		v1.POST("/orders/:order_no/refund", authMw.User(), refundHandler.Apply)

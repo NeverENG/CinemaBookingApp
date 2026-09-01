@@ -11,7 +11,7 @@ import (
 func TestGetSeatMapStatuses(t *testing.T) {
 	now := time.Now()
 	sessions := &fakeSessionRepo{sessions: map[int64]*domain.ShowSession{
-		10: {ID: 10, CinemaID: 100, HallID: 1000, MovieID: 9, StartTime: now.Add(2 * time.Hour), EndTime: now.Add(4 * time.Hour), BasePriceCents: 5000, Status: domain.SessionOpen},
+		10: {ID: 10, CinemaID: 100, HallID: 1000, MovieID: 9, StartTime: now.Add(2 * time.Hour), EndTime: now.Add(4 * time.Hour), BasePriceCents: 5000, PriceRulesJSON: `{"VIP":8000}`, Status: domain.SessionOpen},
 	}}
 	movies := &fakeMovieRepo{movies: map[int64]*domain.Movie{
 		9: {ID: 9, Title: "沙丘3"},
@@ -53,6 +53,13 @@ func TestGetSeatMapStatuses(t *testing.T) {
 		if statusBySeat[seatNo] != status {
 			t.Fatalf("seat %s: expected %s, got %s", seatNo, status, statusBySeat[seatNo])
 		}
+	}
+	priceBySeat := make(map[string]int64, len(view.Seats))
+	for _, seat := range view.Seats {
+		priceBySeat[seat.SeatNo] = seat.PriceCents
+	}
+	if priceBySeat["A1"] != 5000 || priceBySeat["B1"] != 8000 {
+		t.Fatalf("unexpected seat prices: %+v", priceBySeat)
 	}
 }
 

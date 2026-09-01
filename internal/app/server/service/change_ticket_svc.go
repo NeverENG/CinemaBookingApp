@@ -48,8 +48,11 @@ func (s *ChangeTicketSvc) Change(
 	if order.UserID != userID {
 		return nil, domain.ErrForbidden
 	}
-	if order.Status != domain.OrderPaid {
+	if order.Status != domain.OrderPaid || hasUsedTicket(order) {
 		return nil, domain.ErrOrderNotRefundable
+	}
+	if len(order.Items) > 0 && len(newSeatIDs) != len(order.Items) {
+		return nil, domain.ErrChangeSeatCount
 	}
 	oldSession, err := s.sessions.GetSessionByID(ctx, order.SessionID)
 	if err != nil {
@@ -80,7 +83,7 @@ func (s *ChangeTicketSvc) Change(
 	}
 
 	// 2. 支付新单；失败取消新单，原单不受影响
-	payment, err := s.paymentSvc.CreatePayment(ctx, CreatePaymentInput{OrderNo: newOrder.OrderNo})
+	payment, err := s.paymentSvc.CreatePayment(ctx, CreatePaymentInput{UserID: userID, OrderNo: newOrder.OrderNo})
 	if err != nil {
 		_ = s.orderSvc.CancelPending(ctx, userID, newOrder.OrderNo)
 		return nil, err

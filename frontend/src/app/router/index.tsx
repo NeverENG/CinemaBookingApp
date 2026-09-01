@@ -12,11 +12,13 @@ const HallsPage = lazy(() => import('../../pages/admin/HallsPage').then(({ Halls
 const MarketingPage = lazy(() => import('../../pages/admin/MarketingPage').then(({ MarketingPage: page }) => ({ default: page })))
 const MoviesPage = lazy(() => import('../../pages/admin/MoviesPage').then(({ MoviesPage: page }) => ({ default: page })))
 const SessionsPage = lazy(() => import('../../pages/admin/SessionsPage').then(({ SessionsPage: page }) => ({ default: page })))
+const TicketsPage = lazy(() => import('../../pages/admin/TicketsPage').then(({ TicketsPage: page }) => ({ default: page })))
 const CheckoutPage = lazy(() => import('../../pages/user/CheckoutPage').then(({ CheckoutPage: page }) => ({ default: page })))
 const CinemasPage = lazy(() => import('../../pages/user/CinemasPage').then(({ CinemasPage: page }) => ({ default: page })))
 const HomePage = lazy(() => import('../../pages/user/HomePage').then(({ HomePage: page }) => ({ default: page })))
 const MovieDetailPage = lazy(() => import('../../pages/user/MovieDetailPage').then(({ MovieDetailPage: page }) => ({ default: page })))
 const OrderDetailPage = lazy(() => import('../../pages/user/OrderDetailPage').then(({ OrderDetailPage: page }) => ({ default: page })))
+const ChangeTicketPage = lazy(() => import('../../pages/user/ChangeTicketPage').then(({ ChangeTicketPage: page }) => ({ default: page })))
 const OrdersPage = lazy(() => import('../../pages/user/OrdersPage').then(({ OrdersPage: page }) => ({ default: page })))
 const PaymentPage = lazy(() => import('../../pages/user/PaymentPage').then(({ PaymentPage: page }) => ({ default: page })))
 const ProfilePage = lazy(() => import('../../pages/user/ProfilePage').then(({ ProfilePage: page }) => ({ default: page })))
@@ -51,6 +53,7 @@ export const router = createBrowserRouter([
         { path: 'payment/:orderNo', element: lazyElement(PaymentPage) },
         { path: 'orders', element: lazyElement(OrdersPage) },
         { path: 'orders/:orderNo', element: lazyElement(OrderDetailPage) },
+        { path: 'orders/:orderNo/change', element: lazyElement(ChangeTicketPage) },
         { path: 'rewards', element: lazyElement(RewardsPage) },
         { path: 'profile', element: lazyElement(ProfilePage) },
       ] },
@@ -62,11 +65,13 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="dashboard" replace /> },
       { path: 'dashboard', element: <RequireRole roles={['SUPER_ADMIN', 'CINEMA_ADMIN', 'FINANCE']}>{lazyElement(DashboardPage)}</RequireRole> },
-      { path: 'movies', element: <RequireRole roles={['SUPER_ADMIN', 'CINEMA_ADMIN']}>{lazyElement(MoviesPage)}</RequireRole> },
+      { path: 'movies', element: <RequireRole roles={['SUPER_ADMIN']}>{lazyElement(MoviesPage)}</RequireRole> },
       { path: 'halls', element: <RequireRole roles={['SUPER_ADMIN', 'CINEMA_ADMIN']}>{lazyElement(HallsPage)}</RequireRole> },
       { path: 'sessions', element: <RequireRole roles={['SUPER_ADMIN', 'CINEMA_ADMIN']}>{lazyElement(SessionsPage)}</RequireRole> },
-      { path: 'marketing', element: <RequireRole roles={['SUPER_ADMIN', 'CINEMA_ADMIN']}>{lazyElement(MarketingPage)}</RequireRole> },
+      { path: 'tickets', element: <RequireRole roles={['SUPER_ADMIN', 'CINEMA_ADMIN']}>{lazyElement(TicketsPage)}</RequireRole> },
+      { path: 'marketing', element: <RequireRole roles={['SUPER_ADMIN']}>{lazyElement(MarketingPage)}</RequireRole> },
       { path: 'admins', element: <RequireRole roles={['SUPER_ADMIN']}>{lazyElement(AdminsPage)}</RequireRole> },
+      { path: 'profile', element: <RequireRole roles={['SUPER_ADMIN', 'CINEMA_ADMIN', 'FINANCE']}>{lazyElement(ProfilePage)}</RequireRole> },
     ],
   },
   { path: '*', element: lazyElement(NotFoundPage) },

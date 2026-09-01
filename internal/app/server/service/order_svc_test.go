@@ -76,6 +76,7 @@ func (f *fakeSessionRepo) Create(ctx context.Context, session *domain.ShowSessio
 func (f *fakeSessionRepo) UpdatePrice(ctx context.Context, id int64, basePriceCents int64, priceRulesJSON string) error {
 	if s, ok := f.sessions[id]; ok {
 		s.BasePriceCents = basePriceCents
+		s.PriceRulesJSON = priceRulesJSON
 		return nil
 	}
 	return domain.ErrSessionNotFound
@@ -437,6 +438,22 @@ func TestCreateOrderHappyPath(t *testing.T) {
 	}
 }
 
+func TestCreateOrderUsesSeatTypePriceRule(t *testing.T) {
+	users, sessions, seats := baseTestData()
+	sessions.sessions[10].PriceRulesJSON = `{"VIP":8000}`
+	seats.seats[1] = domain.Seat{ID: 1, HallID: 1000, SeatNo: "A1", Type: "VIP", Status: seatStatusEnabled}
+	orders := &fakeOrderRepo{}
+	svc := newTestOrderSvc(users, sessions, seats, &fakeSeatLockRepo{}, &fakeCouponRepo{}, orders)
+
+	order, err := svc.CreateOrder(context.Background(), CreateOrderInput{UserID: 1, SessionID: 10, SeatIDs: []int64{1}})
+	if err != nil {
+		t.Fatalf("create VIP order: %v", err)
+	}
+	if order.PaidCents != 8000 || len(order.Items) != 1 || order.Items[0].PriceCents != 8000 {
+		t.Fatalf("unexpected VIP order pricing: %+v", order)
+	}
+}
+
 func TestCreateOrderWithCoupon(t *testing.T) {
 	users, sessions, seats := baseTestData()
 	coupons := &fakeCouponRepo{
@@ -532,5 +549,32 @@ func TestGetOrderOwnership(t *testing.T) {
 	}
 	if _, err := svc.GetOrder(context.Background(), 999, "O1"); !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+}
+
+func TestCancelPendingReleasesResourcesAndIsIdempotent(t *testing.T) {
+	now := time.Now()
+	couponID := int64(7)
+	orders := &fakeOrderRepo{orders: map[string]*domain.Order{
+		"O1": {OrderNo: "O1", UserID: 1, SessionID: 10, Status: domain.OrderPendingPayment, Version: 1, ExpireAt: now.Add(time.Hour), CouponInstanceID: &couponID},
+	}}
+	locks := &fakeSeatLockRepo{}
+	coupons := &fakeCouponRepo{}
+	svc := newTestOrderSvc(&fakeUserRepo{}, &fakeSessionRepo{sessions: map[int64]*domain.ShowSession{10: {ID: 10}}}, &fakeSeatRepo{}, locks, coupons, orders)
+
+	if err := svc.CancelPending(context.Background(), 1, "O1"); err != nil {
+		t.Fatalf("cancel: %v", err)
+	}
+	if orders.orders["O1"].Status != domain.OrderCanceled {
+		t.Fatalf("expected canceled, got %s", orders.orders["O1"].Status)
+	}
+	if len(locks.releasedOrders) != 1 || len(coupons.unlocked) != 1 {
+		t.Fatalf("expected resources released once, locks=%v coupons=%v", locks.releasedOrders, coupons.unlocked)
+	}
+	if err := svc.CancelPending(context.Background(), 1, "O1"); err != nil {
+		t.Fatalf("duplicate cancel should be idempotent: %v", err)
+	}
+	if len(locks.releasedOrders) != 1 || len(coupons.unlocked) != 1 {
+		t.Fatal("duplicate cancel should not release resources again")
 	}
 }

@@ -8,6 +8,15 @@ const (
 	RoleFinance     = "FINANCE"
 )
 
+func IsAdminRole(role string) bool {
+	switch role {
+	case RoleSuperAdmin, RoleCinemaAdmin, RoleFinance:
+		return true
+	default:
+		return false
+	}
+}
+
 // Role 角色：RBAC 最小模型。
 type Role struct {
 	ID          int64

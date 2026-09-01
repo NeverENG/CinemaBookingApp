@@ -13,6 +13,8 @@ var (
 	ErrCouponNotAvailable = errors.New("coupon not available")
 
 	ErrOrderNotFound     = errors.New("order not found")
+	ErrTicketNotFound    = errors.New("ticket not found")
+	ErrTicketNotUsable   = errors.New("ticket is not usable")
 	ErrOrderExpired      = errors.New("order expired")
 	ErrInvalidTransition = errors.New("invalid order status transition")
 	ErrMoneyInvalid      = errors.New("invalid money")
@@ -50,6 +52,7 @@ var (
 	ErrUsernameTaken       = errors.New("username already taken")
 	ErrInvalidInput        = errors.New("invalid input")
 	ErrChangeMovieMismatch = errors.New("change ticket must be same movie")
+	ErrChangeSeatCount     = errors.New("change ticket seat count mismatch")
 
 	ErrEmailNotRegistered = errors.New("email not registered")
 	ErrResetCodeInvalid   = errors.New("reset code invalid or expired")

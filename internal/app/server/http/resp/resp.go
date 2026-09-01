@@ -30,6 +30,7 @@ func Error(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrUserNotFound),
 		errors.Is(err, domain.ErrSessionNotFound),
 		errors.Is(err, domain.ErrOrderNotFound),
+		errors.Is(err, domain.ErrTicketNotFound),
 		errors.Is(err, domain.ErrPaymentNotFound),
 		errors.Is(err, domain.ErrMovieNotFound),
 		errors.Is(err, domain.ErrHallNotFound),
@@ -40,6 +41,7 @@ func Error(c *gin.Context, err error) {
 		errors.Is(err, domain.ErrSessionNotBookable),
 		errors.Is(err, domain.ErrCouponNotAvailable),
 		errors.Is(err, domain.ErrInvalidTransition),
+		errors.Is(err, domain.ErrTicketNotUsable),
 		errors.Is(err, domain.ErrOrderExpired),
 		errors.Is(err, domain.ErrPaymentAmountMismatch),
 		errors.Is(err, domain.ErrSessionTimeConflict),
@@ -47,6 +49,8 @@ func Error(c *gin.Context, err error) {
 		errors.Is(err, domain.ErrOrderNotRefundable),
 		errors.Is(err, domain.ErrRefundExists),
 		errors.Is(err, domain.ErrChangeMovieMismatch):
+		Fail(c, http.StatusConflict, err.Error())
+	case errors.Is(err, domain.ErrChangeSeatCount):
 		Fail(c, http.StatusConflict, err.Error())
 	case errors.Is(err, domain.ErrMovieInvalid),
 		errors.Is(err, domain.ErrHallInvalid),

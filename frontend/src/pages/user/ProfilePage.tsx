@@ -1,7 +1,7 @@
 import { Check, KeyRound, UserRound } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { roleLabel } from '../../auth'
+import { isAdminRole, roleLabel } from '../../auth'
 import { useAuth } from '../../app/providers'
 import { Avatar, Button, Field, Input, PageHeader } from '../../components/ui'
 import { useAsyncLock } from '../../hooks/useAsyncLock'
@@ -22,7 +22,8 @@ export function ProfilePage() {
     setError('')
     await run(async () => {
       try {
-        await authApi.changePassword({ old_password: oldPassword, new_password: newPassword })
+        const changePassword = isAdminRole(session?.role) ? authApi.changeAdminPassword : authApi.changePassword
+        await changePassword({ old_password: oldPassword, new_password: newPassword })
         setMessage('密码已修改，请重新登录。')
         setOldPassword('')
         setNewPassword('')

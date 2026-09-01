@@ -50,17 +50,24 @@ func NewPaymentSvc(
 }
 
 type CreatePaymentInput struct {
+	UserID  int64
 	OrderNo string
 }
 
 // CreatePayment 为待支付订单创建支付交易（PENDING）。
 // 已存在交易则直接返回（用户重试幂等）；一单一付由 (biz_type, biz_no) 唯一约束兜底。
 func (s *PaymentSvc) CreatePayment(ctx context.Context, in CreatePaymentInput) (*domain.PaymentTransaction, error) {
+	if in.UserID <= 0 {
+		return nil, domain.ErrForbidden
+	}
 	var payment *domain.PaymentTransaction
 	err := s.tx.Run(ctx, func(txCtx context.Context) error {
 		order, err := s.orders.GetOrderByNo(txCtx, in.OrderNo)
 		if err != nil {
 			return err
+		}
+		if order.UserID != in.UserID {
+			return domain.ErrForbidden
 		}
 		if order.Status != domain.OrderPendingPayment {
 			return domain.ErrInvalidTransition
@@ -71,6 +78,9 @@ func (s *PaymentSvc) CreatePayment(ctx context.Context, in CreatePaymentInput) (
 
 		existing, err := s.payments.GetByOrderNo(txCtx, in.OrderNo)
 		if err == nil {
+			if existing.UserID != in.UserID {
+				return domain.ErrForbidden
+			}
 			payment = existing
 			return nil
 		}
@@ -147,6 +157,8 @@ func (s *PaymentSvc) HandleMockCallback(ctx context.Context, in MockCallbackInpu
 		if err := s.payments.Transition(txCtx, payment.TransactionNo, domain.PaymentPending, domain.PaymentSuccess, payment.Version); err != nil {
 			return err
 		}
+		paidAt := time.Now()
+		payment.PaidAt = &paidAt
 
 		order, err := s.orders.GetOrderByNo(txCtx, payment.OrderNo)
 		if err != nil {
@@ -164,6 +176,7 @@ func (s *PaymentSvc) HandleMockCallback(ctx context.Context, in MockCallbackInpu
 		if err := s.orders.Transition(txCtx, order.OrderNo, domain.OrderPendingPayment, domain.OrderPaid, order.Version); err != nil {
 			return err
 		}
+		order.PaidAt = &paidAt
 
 		if err := s.locks.MarkBookedByOrderNo(txCtx, order.OrderNo); err != nil {
 			return err

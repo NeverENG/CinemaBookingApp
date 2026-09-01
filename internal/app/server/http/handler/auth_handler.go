@@ -28,9 +28,10 @@ type adminLoginRequest struct {
 }
 
 type loginResponse struct {
-	Token  string `json:"token"`
-	UserID int64  `json:"user_id"`
-	Role   string `json:"role"`
+	Token    string `json:"token"`
+	UserID   int64  `json:"user_id"`
+	Role     string `json:"role"`
+	CinemaID *int64 `json:"cinema_id,omitempty"`
 }
 
 type registerRequest struct {
@@ -144,5 +145,24 @@ func (h *AuthHandler) AdminLogin(c *gin.Context) {
 		resp.Error(c, err)
 		return
 	}
-	resp.OK(c, loginResponse{Token: token, UserID: admin.ID, Role: admin.RoleCode})
+	resp.OK(c, loginResponse{Token: token, UserID: admin.ID, Role: admin.RoleCode, CinemaID: admin.CinemaID})
+}
+
+// ChangeAdminPassword POST /api/v1/admin/me/password
+func (h *AuthHandler) ChangeAdminPassword(c *gin.Context) {
+	adminID, ok := adminIDFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "invalid admin")
+		return
+	}
+	var req changePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.auth.ChangeAdminPassword(c.Request.Context(), adminID, req.OldPassword, req.NewPassword); err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, gin.H{"status": "ok"})
 }

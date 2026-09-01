@@ -22,3 +22,13 @@ type AdminScope struct {
 func (s AdminScope) IsCinemaAdmin() bool {
 	return s.Role == RoleCinemaAdmin
 }
+
+func (s AdminScope) CanManageCinema(cinemaID int64) bool {
+	if cinemaID <= 0 {
+		return false
+	}
+	if s.Role == RoleSuperAdmin {
+		return true
+	}
+	return s.Role == RoleCinemaAdmin && s.CinemaID != nil && *s.CinemaID == cinemaID
+}

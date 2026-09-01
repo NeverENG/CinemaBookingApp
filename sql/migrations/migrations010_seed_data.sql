@@ -80,7 +80,7 @@ DELETE FROM orders WHERE order_no LIKE 'OSEED%';
 -- ============ 已支付订单（每个历史场次 1~2 单） ============
 INSERT INTO orders (order_no, user_id, session_id, cinema_id, movie_id, status, total_cents, discount_cents, coupon_cents, paid_cents, expire_at, version, created_at, paid_at)
 SELECT 'OSEED' || s.id || '_1',
-       (SELECT id FROM users WHERE username = 'demo'),
+       (SELECT id FROM users WHERE username = {{DEMO_USERNAME}}),
        s.id, s.cinema_id, s.movie_id, 'PAID',
        s.base_price_cents, 0, 0, s.base_price_cents,
        s.start_time - interval '1 day', 1,
@@ -89,7 +89,7 @@ FROM show_sessions s WHERE s.id BETWEEN 101 AND 110;
 
 INSERT INTO orders (order_no, user_id, session_id, cinema_id, movie_id, status, total_cents, discount_cents, coupon_cents, paid_cents, expire_at, version, created_at, paid_at)
 SELECT 'OSEED' || s.id || '_2',
-       (SELECT id FROM users WHERE username = 'demo'),
+       (SELECT id FROM users WHERE username = {{DEMO_USERNAME}}),
        s.id, s.cinema_id, s.movie_id, 'PAID',
        s.base_price_cents, 0, 0, s.base_price_cents,
        s.start_time - interval '1 day', 1,

@@ -115,3 +115,18 @@ func (h *OrderHandler) List(c *gin.Context) {
 	}
 	resp.OK(c, orders)
 }
+
+// Cancel POST /api/v1/orders/:order_no/cancel
+func (h *OrderHandler) Cancel(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "invalid user")
+		return
+	}
+	orderNo := c.Param("order_no")
+	if err := h.orders.CancelPending(c.Request.Context(), userID, orderNo); err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, gin.H{"order_no": orderNo, "status": "CANCELED"})
+}

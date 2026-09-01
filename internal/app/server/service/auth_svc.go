@@ -152,6 +152,24 @@ func (s *AuthSvc) ChangePassword(ctx context.Context, userID int64, oldPassword,
 	return s.users.UpdatePassword(ctx, userID, hash)
 }
 
+func (s *AuthSvc) ChangeAdminPassword(ctx context.Context, adminID int64, oldPassword, newPassword string) error {
+	admin, err := s.admins.GetByID(ctx, adminID)
+	if err != nil {
+		return err
+	}
+	if admin.Status != "ACTIVE" || !crypto.CheckPassword(admin.PasswordHash, oldPassword) {
+		return domain.ErrInvalidCredentials
+	}
+	if len(newPassword) < 6 {
+		return domain.ErrInvalidInput
+	}
+	hash, err := crypto.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	return s.admins.UpdatePassword(ctx, adminID, hash)
+}
+
 // RequestPasswordReset 生成验证码并发邮件；SMTP 未配置时返回 devCode 供本地调试。
 func (s *AuthSvc) RequestPasswordReset(ctx context.Context, email string) (string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
@@ -238,9 +256,11 @@ func (s *AuthSvc) AdminLogin(ctx context.Context, username, password string) (st
 	role, err := s.roles.GetByID(ctx, admin.RoleID)
 	if err != nil {
 		s.recordLoginFailure(ctx, loginScopeAdmin, username)
-		return "", nil, err
+		return "", nil, domain.ErrInvalidCredentials
 	}
-	if admin.Status != "ACTIVE" || !crypto.CheckPassword(admin.PasswordHash, password) {
+	if admin.Status != "ACTIVE" || role.Status != "ACTIVE" || !domain.IsAdminRole(role.Code) ||
+		(role.Code == domain.RoleCinemaAdmin && (admin.CinemaID == nil || *admin.CinemaID <= 0)) ||
+		!crypto.CheckPassword(admin.PasswordHash, password) {
 		s.recordLoginFailure(ctx, loginScopeAdmin, username)
 		return "", nil, domain.ErrInvalidCredentials
 	}

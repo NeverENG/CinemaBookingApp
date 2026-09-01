@@ -7,6 +7,7 @@ export function RequireAuth() {
   const { session } = useAuth()
   const location = useLocation()
   if (!session) return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />
+  if (session.role !== 'USER') return <Navigate to="/forbidden" replace />
   return <Outlet />
 }
 

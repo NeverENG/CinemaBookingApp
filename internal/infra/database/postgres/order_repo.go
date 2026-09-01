@@ -8,6 +8,7 @@ import (
 	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
 	"github.com/NeverENG/CinemaBookingApp/internal/core/port"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // orderRow 是 orders 表的 GORM 行模型（只存在于 infra，domain 不打 tag）。
@@ -50,6 +51,7 @@ type OrderRepo struct {
 }
 
 var _ port.OrderRepo = (*OrderRepo)(nil)
+var _ port.TicketRepo = (*OrderRepo)(nil)
 
 func NewOrderRepo(db *DB) *OrderRepo {
 	return &OrderRepo{db: db}
@@ -87,14 +89,64 @@ func (r *OrderRepo) GetOrderByNo(ctx context.Context, orderNo string) (*domain.O
 	return toDomainOrder(row, itemRows), nil
 }
 
+// GetOrderByTicketNo 查询票券所属订单，并锁住订单行，串行化同一订单的并发核销。
+func (r *OrderRepo) GetOrderByTicketNo(ctx context.Context, ticketNo string) (*domain.Order, error) {
+	var item orderItemRow
+	query := r.db.db(ctx)
+	if err := query.Where("ticket_no = ?", ticketNo).First(&item).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrTicketNotFound
+		}
+		return nil, err
+	}
+
+	var row orderRow
+	if err := query.Clauses(clause.Locking{Strength: "UPDATE"}).Where("order_no = ?", item.OrderNo).First(&row).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrOrderNotFound
+		}
+		return nil, err
+	}
+	var itemRows []orderItemRow
+	if err := query.Where("order_no = ?", item.OrderNo).Order("id").Find(&itemRows).Error; err != nil {
+		return nil, err
+	}
+	return toDomainOrder(row, itemRows), nil
+}
+
+// MarkTicketUsed 仅允许把未核销票更新一次，返回是否由本次请求完成更新。
+func (r *OrderRepo) MarkTicketUsed(ctx context.Context, ticketNo string, usedAt time.Time) (bool, error) {
+	result := r.db.db(ctx).
+		Model(&orderItemRow{}).
+		Where("ticket_no = ? AND used_at IS NULL", ticketNo).
+		Update("used_at", usedAt)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected == 1, nil
+}
+
+func (r *OrderRepo) CountUnusedTickets(ctx context.Context, orderNo string) (int64, error) {
+	var count int64
+	err := r.db.db(ctx).
+		Model(&orderItemRow{}).
+		Where("order_no = ? AND used_at IS NULL", orderNo).
+		Count(&count).Error
+	return count, err
+}
+
 func (r *OrderRepo) Transition(ctx context.Context, orderNo string, from, to domain.OrderStatus, version int32) error {
+	updates := map[string]any{
+		"status":  to,
+		"version": gorm.Expr("version + 1"),
+	}
+	if from == domain.OrderPendingPayment && to == domain.OrderPaid {
+		updates["paid_at"] = time.Now()
+	}
 	res := r.db.db(ctx).
 		Model(&orderRow{}).
 		Where("order_no = ? AND status = ? AND version = ?", orderNo, from, version).
-		Updates(map[string]any{
-			"status":  to,
-			"version": gorm.Expr("version + 1"),
-		})
+		Updates(updates)
 	if res.Error != nil {
 		return res.Error
 	}
@@ -131,13 +183,12 @@ func (r *OrderRepo) ExpirePendingBySessionID(ctx context.Context, sessionID int6
 	if len(orderNos) == 0 {
 		return orderNos, nil
 	}
-	now := time.Now()
 	err = r.db.db(ctx).
 		Model(&orderRow{}).
 		Where("session_id = ? AND status = ?", sessionID, domain.OrderPendingPayment).
 		Updates(map[string]any{
-			"status":     domain.OrderExpired,
-			"expired_at": now,
+			"status":  domain.OrderExpired,
+			"version": gorm.Expr("version + 1"),
 		}).Error
 	return orderNos, err
 }

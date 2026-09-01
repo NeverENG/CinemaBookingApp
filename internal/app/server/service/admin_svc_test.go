@@ -142,7 +142,7 @@ func TestAdminMovieCreate(t *testing.T) {
 	logs := &fakeOperationLogRepo{}
 	svc := NewAdminMovieSvc(movies, logs)
 
-	movie, err := svc.Create(context.Background(), 1, MovieInput{
+	movie, err := svc.Create(context.Background(), superAdminScope, MovieInput{
 		Title:           "沙丘3",
 		DurationMinutes: 160,
 		Rating:          8.8,
@@ -163,7 +163,7 @@ func TestAdminMovieCreateInvalid(t *testing.T) {
 	logs := &fakeOperationLogRepo{}
 	svc := NewAdminMovieSvc(movies, logs)
 
-	_, err := svc.Create(context.Background(), 1, MovieInput{})
+	_, err := svc.Create(context.Background(), superAdminScope, MovieInput{})
 	if !errors.Is(err, domain.ErrMovieInvalid) {
 		t.Fatalf("expected ErrMovieInvalid, got %v", err)
 	}
@@ -213,6 +213,13 @@ func TestParseSeatLayoutInvalid(t *testing.T) {
 	}
 }
 
+func TestBuildSeatsSupportsMoreThan26Rows(t *testing.T) {
+	seats := buildSeats(&seatLayout{Rows: 28, Cols: 1})
+	if len(seats) != 28 || seats[25].SeatNo != "Z1" || seats[26].SeatNo != "AA1" || seats[27].SeatNo != "AB1" {
+		t.Fatalf("unexpected row labels: %+v", seats[24:])
+	}
+}
+
 func TestAdminSessionCreate(t *testing.T) {
 	now := time.Now()
 	sessions := &fakeSessionRepo{}
@@ -237,6 +244,63 @@ func TestAdminSessionCreate(t *testing.T) {
 	}
 	if session.Status != domain.SessionOpen || session.ID == 0 {
 		t.Fatal("unexpected session state")
+	}
+}
+
+func TestAdminSessionPriceRules(t *testing.T) {
+	now := time.Now()
+	sessions := &fakeSessionRepo{}
+	movies := &fakeMovieRepo{movies: map[int64]*domain.Movie{
+		1: {ID: 1, Title: "沙丘3", DurationMinutes: 90, Status: domain.MovieOnSale},
+	}}
+	halls := &fakeHallRepo{halls: map[int64]*domain.Hall{
+		10: {ID: 10, CinemaID: 100, Name: "IMAX厅"},
+	}}
+	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeOperationLogRepo{})
+
+	session, err := svc.Create(context.Background(), superAdminScope, SessionInput{
+		CinemaID:       100,
+		HallID:         10,
+		MovieID:        1,
+		StartTime:      now.Add(2 * time.Hour),
+		EndTime:        now.Add(3 * time.Hour),
+		BasePriceCents: 5000,
+		PriceRulesJSON: `{"VIP":8000}`,
+	})
+	if err != nil {
+		t.Fatalf("create session with price rules: %v", err)
+	}
+	if session.PriceRulesJSON != `{"VIP":8000}` {
+		t.Fatalf("expected normalized VIP rules, got %s", session.PriceRulesJSON)
+	}
+
+	if err := svc.UpdatePrice(context.Background(), superAdminScope, session.ID, 6000, `{"VIP":9000}`); err != nil {
+		t.Fatalf("update session price rules: %v", err)
+	}
+	updated := sessions.sessions[session.ID]
+	if updated.BasePriceCents != 6000 || updated.PriceRulesJSON != `{"VIP":9000}` {
+		t.Fatalf("unexpected updated prices: %+v", updated)
+	}
+}
+
+func TestAdminSessionRejectsInvalidPriceRules(t *testing.T) {
+	now := time.Now()
+	sessions := &fakeSessionRepo{}
+	movies := &fakeMovieRepo{movies: map[int64]*domain.Movie{1: {ID: 1, Title: "沙丘3", DurationMinutes: 90, Status: domain.MovieOnSale}}}
+	halls := &fakeHallRepo{halls: map[int64]*domain.Hall{10: {ID: 10, CinemaID: 100, Name: "1号厅"}}}
+	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeOperationLogRepo{})
+
+	_, err := svc.Create(context.Background(), superAdminScope, SessionInput{
+		CinemaID:       100,
+		HallID:         10,
+		MovieID:        1,
+		StartTime:      now.Add(2 * time.Hour),
+		EndTime:        now.Add(3 * time.Hour),
+		BasePriceCents: 5000,
+		PriceRulesJSON: `{"VIP":0}`,
+	})
+	if !errors.Is(err, domain.ErrSessionInvalid) {
+		t.Fatalf("expected invalid price rules, got %v", err)
 	}
 }
 
@@ -269,7 +333,7 @@ func TestAdminSessionCreateOverlap(t *testing.T) {
 func TestAdminSessionCancel(t *testing.T) {
 	now := time.Now()
 	sessions := &fakeSessionRepo{sessions: map[int64]*domain.ShowSession{
-		5: {ID: 5, HallID: 10, StartTime: now.Add(2 * time.Hour), EndTime: now.Add(3 * time.Hour), Status: domain.SessionOpen},
+		5: {ID: 5, CinemaID: 100, HallID: 10, StartTime: now.Add(2 * time.Hour), EndTime: now.Add(3 * time.Hour), Status: domain.SessionOpen},
 	}}
 	movies := &fakeMovieRepo{}
 	halls := &fakeHallRepo{}

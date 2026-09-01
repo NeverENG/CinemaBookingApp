@@ -44,17 +44,19 @@ type SessionView struct {
 	StartTime      time.Time            `json:"start_time"`
 	EndTime        time.Time            `json:"end_time"`
 	BasePriceCents int64                `json:"base_price_cents"`
+	PriceRulesJSON string               `json:"price_rules"`
 	Status         domain.SessionStatus `json:"status"`
 	RemainingSeats int                  `json:"remaining_seats"`
 }
 
 type SeatView struct {
-	SeatID int64  `json:"seat_id"`
-	RowNo  int    `json:"row_no"`
-	ColNo  int    `json:"col_no"`
-	SeatNo string `json:"seat_no"`
-	Type   string `json:"type"`
-	Status string `json:"status"`
+	SeatID     int64  `json:"seat_id"`
+	RowNo      int    `json:"row_no"`
+	ColNo      int    `json:"col_no"`
+	SeatNo     string `json:"seat_no"`
+	Type       string `json:"type"`
+	Status     string `json:"status"`
+	PriceCents int64  `json:"price_cents"`
 }
 
 type SeatMapView struct {
@@ -76,6 +78,10 @@ func (s *SeatMapSvc) GetSeatMap(ctx context.Context, sessionID int64) (*SeatMapV
 	}
 
 	seats, err := s.seats.ListByHallID(ctx, session.HallID)
+	if err != nil {
+		return nil, err
+	}
+	priceRules, err := parsePriceRules(session.PriceRulesJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -112,13 +118,18 @@ func (s *SeatMapSvc) GetSeatMap(ctx context.Context, sessionID int64) (*SeatMapV
 		if status == "available" && seat.Status == domain.SeatEnabled {
 			remainingSeats++
 		}
+		price, err := priceForSeat(session, priceRules, seat)
+		if err != nil {
+			return nil, err
+		}
 		seatViews = append(seatViews, SeatView{
-			SeatID: seat.ID,
-			RowNo:  seat.RowNo,
-			ColNo:  seat.ColNo,
-			SeatNo: seat.SeatNo,
-			Type:   seat.Type,
-			Status: status,
+			SeatID:     seat.ID,
+			RowNo:      seat.RowNo,
+			ColNo:      seat.ColNo,
+			SeatNo:     seat.SeatNo,
+			Type:       seat.Type,
+			Status:     status,
+			PriceCents: price,
 		})
 	}
 	view.RemainingSeats = remainingSeats
@@ -173,6 +184,7 @@ func (s *SeatMapSvc) sessionView(ctx context.Context, session *domain.ShowSessio
 		StartTime:      session.StartTime,
 		EndTime:        session.EndTime,
 		BasePriceCents: session.BasePriceCents,
+		PriceRulesJSON: session.PriceRulesJSON,
 		Status:         session.Status,
 	}, nil
 }

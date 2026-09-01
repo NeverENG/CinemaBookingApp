@@ -1,7 +1,7 @@
 import { http } from '../http/client'
 import { demoCoupons, demoDashboardCinemas, demoDashboardMovies, demoDashboardSummary, demoDashboardTrend, demoHalls, demoMovies } from '../../demo'
-import type { Banner, CouponTemplate, DashboardCinemaRow, DashboardMovieRow, DashboardSummary, DashboardTrendRow, Hall, Movie } from '../../types'
-import { normalizeBanner, normalizeCinemaRanking, normalizeCoupon, normalizeHall, normalizeMovie, normalizeMovieRanking, normalizeSession, normalizeSummary, normalizeTrend } from './normalize'
+import type { Banner, CouponTemplate, DashboardCinemaRow, DashboardMovieRow, DashboardSummary, DashboardTrendRow, Hall, Movie, TicketVerification } from '../../types'
+import { normalizeBanner, normalizeCinemaRanking, normalizeCoupon, normalizeHall, normalizeMovie, normalizeMovieRanking, normalizeSession, normalizeSummary, normalizeTicketVerification, normalizeTrend } from './normalize'
 
 type Query = Record<string, string | number | undefined>
 type Raw = Record<string, unknown>
@@ -40,6 +40,9 @@ export const adminApi = {
   },
   admins: {
     create: (payload: Record<string, unknown>) => http.post('/admin/admins', payload).then((response) => response.data),
+  },
+  tickets: {
+    verify: async (ticketNo: string): Promise<TicketVerification> => normalizeTicketVerification(await http.post('/admin/tickets/verify', { ticket_no: ticketNo }).then((response) => response.data)),
   },
   dashboard: {
     summary: async (params: Query): Promise<DashboardSummary> => normalizeSummary(await http.get('/admin/dashboard/box-office/summary', { params }).then((response) => response.data)),

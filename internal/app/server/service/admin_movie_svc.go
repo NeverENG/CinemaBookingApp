@@ -30,7 +30,10 @@ type MovieInput struct {
 	Rating          float64
 }
 
-func (s *AdminMovieSvc) Create(ctx context.Context, adminID int64, in MovieInput) (*domain.Movie, error) {
+func (s *AdminMovieSvc) Create(ctx context.Context, scope domain.AdminScope, in MovieInput) (*domain.Movie, error) {
+	if scope.Role != domain.RoleSuperAdmin {
+		return nil, domain.ErrForbidden
+	}
 	movie := &domain.Movie{
 		Title:           in.Title,
 		CoverURL:        in.CoverURL,
@@ -49,10 +52,13 @@ func (s *AdminMovieSvc) Create(ctx context.Context, adminID int64, in MovieInput
 	if err := s.movies.Create(ctx, movie); err != nil {
 		return nil, err
 	}
-	return movie, s.log(ctx, adminID, "CREATE_MOVIE", "movie", strconv.FormatInt(movie.ID, 10), movie)
+	return movie, s.log(ctx, scope.AdminID, "CREATE_MOVIE", "movie", strconv.FormatInt(movie.ID, 10), movie)
 }
 
-func (s *AdminMovieSvc) Update(ctx context.Context, adminID, movieID int64, in MovieInput) (*domain.Movie, error) {
+func (s *AdminMovieSvc) Update(ctx context.Context, scope domain.AdminScope, movieID int64, in MovieInput) (*domain.Movie, error) {
+	if scope.Role != domain.RoleSuperAdmin {
+		return nil, domain.ErrForbidden
+	}
 	movie, err := s.movies.GetByID(ctx, movieID)
 	if err != nil {
 		return nil, err
@@ -71,17 +77,20 @@ func (s *AdminMovieSvc) Update(ctx context.Context, adminID, movieID int64, in M
 	if err := s.movies.Update(ctx, movie); err != nil {
 		return nil, err
 	}
-	return movie, s.log(ctx, adminID, "UPDATE_MOVIE", "movie", strconv.FormatInt(movie.ID, 10), movie)
+	return movie, s.log(ctx, scope.AdminID, "UPDATE_MOVIE", "movie", strconv.FormatInt(movie.ID, 10), movie)
 }
 
-func (s *AdminMovieSvc) SetStatus(ctx context.Context, adminID, movieID int64, status domain.MovieStatus) error {
+func (s *AdminMovieSvc) SetStatus(ctx context.Context, scope domain.AdminScope, movieID int64, status domain.MovieStatus) error {
+	if scope.Role != domain.RoleSuperAdmin {
+		return domain.ErrForbidden
+	}
 	if _, err := s.movies.GetByID(ctx, movieID); err != nil {
 		return err
 	}
 	if err := s.movies.SetStatus(ctx, movieID, status); err != nil {
 		return err
 	}
-	return s.log(ctx, adminID, "SET_MOVIE_STATUS", "movie", strconv.FormatInt(movieID, 10), map[string]string{"status": string(status)})
+	return s.log(ctx, scope.AdminID, "SET_MOVIE_STATUS", "movie", strconv.FormatInt(movieID, 10), map[string]string{"status": string(status)})
 }
 
 func (s *AdminMovieSvc) List(ctx context.Context) ([]domain.Movie, error) {

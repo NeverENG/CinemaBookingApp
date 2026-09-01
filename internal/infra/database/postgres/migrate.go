@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -34,11 +35,23 @@ func ApplyAllMigrations(db *gorm.DB, dir string) error {
 
 // ApplyMigrations 逐个执行迁移文件中的 SQL 语句（按 ; 切分，忽略注释）。
 func ApplyMigrations(db *gorm.DB, path string) error {
+	demoUsername := os.Getenv("DEMO_USERNAME")
+	if demoUsername == "" {
+		demoUsername = "demo"
+	}
+	return ApplyMigrationsWithVars(db, path, map[string]string{"DEMO_USERNAME": demoUsername})
+}
+
+func ApplyMigrationsWithVars(db *gorm.DB, path string, vars map[string]string) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	for _, stmt := range strings.Split(string(raw), ";") {
+	rawSQL, err := renderMigrationSQL(string(raw), vars)
+	if err != nil {
+		return fmt.Errorf("render migration %q: %w", path, err)
+	}
+	for _, stmt := range strings.Split(rawSQL, ";") {
 		stmt = cleanSQL(stmt)
 		if stmt == "" {
 			continue
@@ -48,6 +61,29 @@ func ApplyMigrations(db *gorm.DB, path string) error {
 		}
 	}
 	return nil
+}
+
+var migrationVariablePattern = regexp.MustCompile(`\{\{([A-Za-z0-9_]+)\}\}`)
+
+func renderMigrationSQL(raw string, vars map[string]string) (string, error) {
+	var renderErr error
+	rendered := migrationVariablePattern.ReplaceAllStringFunc(raw, func(token string) string {
+		key := strings.TrimSuffix(strings.TrimPrefix(token, "{{"), "}}")
+		value, ok := vars[key]
+		if !ok {
+			renderErr = fmt.Errorf("missing variable %q", key)
+			return token
+		}
+		if strings.IndexByte(value, 0) >= 0 {
+			renderErr = fmt.Errorf("variable %q contains NUL", key)
+			return token
+		}
+		return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+	})
+	if renderErr != nil {
+		return "", renderErr
+	}
+	return rendered, nil
 }
 
 func cleanSQL(s string) string {

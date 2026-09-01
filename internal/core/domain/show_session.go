@@ -20,6 +20,7 @@ type ShowSession struct {
 	StartTime      time.Time
 	EndTime        time.Time
 	BasePriceCents int64
+	PriceRulesJSON string
 	Status         SessionStatus
 }
 

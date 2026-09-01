@@ -39,11 +39,13 @@ func main() {
 		}
 		if err := wire.EnsureBootstrap(cfg); err != nil {
 			log.Fatalf("bootstrap: %v", err)
-		}
-		if *seed {
-			if err := postgres.ApplyMigrations(db, "sql/migrations/migrations010_seed_data.sql"); err != nil {
-				log.Fatalf("seed: %v", err)
 			}
+			if *seed {
+				if err := postgres.ApplyMigrationsWithVars(db, "sql/migrations/migrations010_seed_data.sql", map[string]string{
+					"DEMO_USERNAME": cfg.Demo.Username,
+				}); err != nil {
+					log.Fatalf("seed: %v", err)
+				}
 		}
 		log.Printf("database prepared: migrate=%t seed=%t", *migrate, *seed)
 		return

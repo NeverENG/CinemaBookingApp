@@ -67,7 +67,7 @@ func (s *RefundSvc) ApplyRefund(ctx context.Context, userID int64, in ApplyRefun
 		} else if !errors.Is(err, domain.ErrRefundNotFound) {
 			return err
 		}
-		if order.Status != domain.OrderPaid {
+		if order.Status != domain.OrderPaid || hasUsedTicket(order) {
 			return domain.ErrOrderNotRefundable
 		}
 		session, err := s.sessions.GetSessionByID(txCtx, order.SessionID)

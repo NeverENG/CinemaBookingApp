@@ -78,11 +78,24 @@ func (s *BoxOfficeSvc) Reconcile(ctx context.Context) error {
 
 // applyBoxScope 影院管理员只能看自己影院。
 func applyBoxScope(q *DashboardQuery, scope domain.AdminScope) error {
-	if scope.IsCinemaAdmin() {
-		if scope.CinemaID == nil {
+	switch scope.Role {
+	case domain.RoleSuperAdmin:
+		return nil
+	case domain.RoleCinemaAdmin:
+		if scope.CinemaID == nil || *scope.CinemaID <= 0 {
 			return domain.ErrForbidden
 		}
 		q.CinemaID = *scope.CinemaID
+		return nil
+	case domain.RoleFinance:
+		if scope.CinemaID != nil && *scope.CinemaID <= 0 {
+			return domain.ErrForbidden
+		}
+		if scope.CinemaID != nil {
+			q.CinemaID = *scope.CinemaID
+		}
+		return nil
+	default:
+		return domain.ErrForbidden
 	}
-	return nil
 }

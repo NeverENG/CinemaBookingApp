@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
 	"github.com/NeverENG/CinemaBookingApp/internal/core/port"
@@ -20,6 +21,7 @@ type userRow struct {
 	TotalEarnedPoints    int    `gorm:"column:total_earned_points"`
 	TotalReclaimedPoints int    `gorm:"column:total_reclaimed_points"`
 	Status               string `gorm:"column:status"`
+	DeletedAt            *time.Time `gorm:"column:deleted_at"`
 }
 
 func (userRow) TableName() string { return "users" }
@@ -37,7 +39,7 @@ func NewUserRepo(db *DB) *UserRepo {
 
 func (r *UserRepo) GetUserByID(ctx context.Context, id int64) (*domain.User, error) {
 	var row userRow
-	err := r.db.db(ctx).Where("id = ?", id).First(&row).Error
+	err := r.db.db(ctx).Where("id = ? AND deleted_at IS NULL", id).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrUserNotFound
 	}
@@ -57,7 +59,7 @@ func (r *UserRepo) GetUserByID(ctx context.Context, id int64) (*domain.User, err
 
 func (r *UserRepo) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
 	var row userRow
-	err := r.db.db(ctx).Where("username = ?", username).First(&row).Error
+	err := r.db.db(ctx).Where("username = ? AND deleted_at IS NULL", username).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrUserNotFound
 	}
@@ -93,6 +95,6 @@ func (r *UserRepo) Create(ctx context.Context, user *domain.User) error {
 func (r *UserRepo) UpdatePassword(ctx context.Context, userID int64, passwordHash string) error {
 	return r.db.db(ctx).
 		Model(&userRow{}).
-		Where("id = ?", userID).
+		Where("id = ? AND deleted_at IS NULL", userID).
 		Update("password_hash", passwordHash).Error
 }

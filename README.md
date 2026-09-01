@@ -43,6 +43,8 @@ Seed 可重复执行，会重建 `OSEED*` 演示订单和演示票房数据：
 docker compose run --rm migrate -seed
 ```
 
+Seed 会使用 `DEMO_USERNAME` 对应的演示用户；修改 `.env` 后重新执行上述命令即可切换演示账号。
+
 完整重置数据库：
 
 ```bash

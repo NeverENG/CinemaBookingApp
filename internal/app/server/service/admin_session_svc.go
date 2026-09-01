@@ -67,12 +67,16 @@ type SessionInput struct {
 }
 
 func (s *AdminSessionSvc) Create(ctx context.Context, scope domain.AdminScope, in SessionInput) (*domain.ShowSession, error) {
-	if scope.IsCinemaAdmin() && (scope.CinemaID == nil || *scope.CinemaID != in.CinemaID) {
+	if !scope.CanManageCinema(in.CinemaID) {
 		return nil, domain.ErrForbidden
 	}
 	if in.HallID <= 0 || in.MovieID <= 0 || in.BasePriceCents <= 0 ||
 		!in.EndTime.After(in.StartTime) {
 		return nil, domain.ErrSessionInvalid
+	}
+	priceRulesJSON, err := normalizePriceRulesJSON(in.PriceRulesJSON)
+	if err != nil {
+		return nil, err
 	}
 	if _, err := s.movies.GetByID(ctx, in.MovieID); err != nil {
 		return nil, err
@@ -100,6 +104,7 @@ func (s *AdminSessionSvc) Create(ctx context.Context, scope domain.AdminScope, i
 		StartTime:      in.StartTime,
 		EndTime:        in.EndTime,
 		BasePriceCents: in.BasePriceCents,
+		PriceRulesJSON: priceRulesJSON,
 		Status:         domain.SessionOpen,
 	}
 	if err := s.sessions.Create(ctx, session); err != nil {
@@ -114,7 +119,7 @@ func (s *AdminSessionSvc) UpdatePrice(ctx context.Context, scope domain.AdminSco
 	if err != nil {
 		return err
 	}
-	if scope.IsCinemaAdmin() && (scope.CinemaID == nil || *scope.CinemaID != session.CinemaID) {
+	if !scope.CanManageCinema(session.CinemaID) {
 		return domain.ErrForbidden
 	}
 	if !s.canChange(session) {
@@ -122,6 +127,10 @@ func (s *AdminSessionSvc) UpdatePrice(ctx context.Context, scope domain.AdminSco
 	}
 	if basePriceCents <= 0 {
 		return domain.ErrSessionInvalid
+	}
+	priceRulesJSON, err = normalizePriceRulesJSON(priceRulesJSON)
+	if err != nil {
+		return err
 	}
 	if err := s.sessions.UpdatePrice(ctx, sessionID, basePriceCents, priceRulesJSON); err != nil {
 		return err
@@ -138,7 +147,7 @@ func (s *AdminSessionSvc) Cancel(ctx context.Context, scope domain.AdminScope, s
 	if err != nil {
 		return err
 	}
-	if scope.IsCinemaAdmin() && (scope.CinemaID == nil || *scope.CinemaID != session.CinemaID) {
+	if !scope.CanManageCinema(session.CinemaID) {
 		return domain.ErrForbidden
 	}
 	if !s.canChange(session) {

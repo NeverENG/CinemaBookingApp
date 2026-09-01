@@ -2,7 +2,9 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
@@ -18,6 +20,7 @@ type showSessionRow struct {
 	StartTime      time.Time            `gorm:"column:start_time"`
 	EndTime        time.Time            `gorm:"column:end_time"`
 	BasePriceCents int64                `gorm:"column:base_price_cents"`
+	PriceRulesJSON string               `gorm:"column:price_rules_json"`
 	Status         domain.SessionStatus `gorm:"column:status"`
 }
 
@@ -51,6 +54,7 @@ func (r *SessionRepo) GetSessionByID(ctx context.Context, id int64) (*domain.Sho
 		StartTime:      row.StartTime,
 		EndTime:        row.EndTime,
 		BasePriceCents: row.BasePriceCents,
+		PriceRulesJSON: row.PriceRulesJSON,
 		Status:         row.Status,
 	}, nil
 }
@@ -63,6 +67,7 @@ func (r *SessionRepo) Create(ctx context.Context, session *domain.ShowSession) e
 		StartTime:      session.StartTime,
 		EndTime:        session.EndTime,
 		BasePriceCents: session.BasePriceCents,
+		PriceRulesJSON: session.PriceRulesJSON,
 		Status:         session.Status,
 	}
 	if err := r.db.db(ctx).Create(row).Error; err != nil {
@@ -73,6 +78,13 @@ func (r *SessionRepo) Create(ctx context.Context, session *domain.ShowSession) e
 }
 
 func (r *SessionRepo) UpdatePrice(ctx context.Context, id int64, basePriceCents int64, priceRulesJSON string) error {
+	priceRulesJSON = strings.TrimSpace(priceRulesJSON)
+	if priceRulesJSON == "" {
+		priceRulesJSON = "{}"
+	}
+	if !json.Valid([]byte(priceRulesJSON)) {
+		return domain.ErrSessionInvalid
+	}
 	return r.db.db(ctx).
 		Model(&showSessionRow{}).
 		Where("id = ?", id).
@@ -115,6 +127,7 @@ func (r *SessionRepo) ListOverlapping(ctx context.Context, hallID int64, start, 
 			StartTime:      row.StartTime,
 			EndTime:        row.EndTime,
 			BasePriceCents: row.BasePriceCents,
+			PriceRulesJSON: row.PriceRulesJSON,
 			Status:         row.Status,
 		})
 	}
@@ -146,6 +159,7 @@ func (r *SessionRepo) ListByFilter(ctx context.Context, movieID, cinemaID int64)
 			StartTime:      row.StartTime,
 			EndTime:        row.EndTime,
 			BasePriceCents: row.BasePriceCents,
+			PriceRulesJSON: row.PriceRulesJSON,
 			Status:         row.Status,
 		})
 	}

@@ -582,6 +582,74 @@ img { max-width: 100%; display: block; }
 .admin-notice { padding: 14px; border: 1px solid rgba(212, 175, 101, 0.2); color: var(--admin-text-secondary); background: rgba(212, 175, 101, 0.05); border-radius: 8px; font-size: 11px; }
 .mobile-menu, .mobile-close { display: none; }
 
+.session-admin-card { grid-template-columns: 110px minmax(0, 1fr) 120px 110px auto; }
+.session-admin-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.session-admin-actions button { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 8px; border: 1px solid var(--admin-border); border-radius: 6px; color: var(--admin-text-secondary); background: transparent; font-size: 10px; }
+.session-admin-actions button:hover { border-color: var(--admin-gold); color: var(--admin-gold); }
+.layout-editor-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; color: var(--admin-text-muted); font-size: 10px; }
+.layout-editor-tools button { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 8px; border: 1px solid var(--admin-border); border-radius: 6px; color: var(--admin-text-secondary); background: var(--admin-surface-raised); font-size: 10px; }
+.layout-editor-tools button.active { border-color: var(--admin-gold); color: var(--admin-gold); }
+.layout-dot { width: 9px; height: 9px; display: inline-block; border: 1px solid currentColor; border-radius: 3px; background: #4c5862; }
+.layout-dot.vip { color: #d4af65; background: rgba(212, 175, 101, 0.8); }
+.layout-dot.disabled { color: #77818a; background: transparent; }
+.layout-editor-grid { display: grid; gap: 5px; max-height: 330px; overflow: auto; padding: 14px; border: 1px solid var(--admin-border); border-radius: 8px; background: #10151a; }
+.layout-editor-seat { min-width: 0; aspect-ratio: 1; padding: 0; border: 1px solid #41505c; border-radius: 4px; color: var(--admin-text-secondary); background: #2d3942; font-size: 9px; }
+.layout-editor-seat.vip { border-color: #b28c4c; color: #1e1a12; background: #d4af65; }
+.layout-editor-seat.disabled { border-color: transparent; color: #5a646d; background: #1b2228; }
+.layout-editor-seat:hover { border-color: var(--admin-gold); }
+.layout-editor-summary { display: flex; flex-wrap: wrap; gap: 14px; color: var(--admin-text-muted); font-size: 10px; }
+.ticket-verify-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(250px, 0.75fr); gap: 14px; }
+.ticket-verify-panel, .ticket-verify-aside, .ticket-verify-result { border: 1px solid var(--admin-border); border-radius: 11px; background: var(--admin-surface); }
+.ticket-verify-panel { padding: 27px; }
+.ticket-verify-icon, .ticket-verify-aside-icon, .ticket-verify-result-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 10px; color: var(--admin-gold); background: rgba(212, 175, 101, 0.1); }
+.ticket-verify-panel h2 { margin: 18px 0 6px; color: var(--admin-text); font-size: 17px; }
+.ticket-verify-panel p { margin: 0 0 20px; color: var(--admin-text-secondary); font-size: 11px; }
+.ticket-verify-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.ticket-verify-form .button { min-height: 36px; }
+.ticket-verify-aside { display: grid; align-content: start; gap: 10px; padding: 22px; }
+.ticket-verify-aside strong { color: var(--admin-text); font-size: 13px; }
+.ticket-verify-aside span { color: var(--admin-text-secondary); font-size: 11px; line-height: 1.6; }
+.ticket-verify-empty { min-height: 230px; margin-top: 14px; border: 1px dashed var(--admin-border); border-radius: 11px; }
+.ticket-verify-result { margin-top: 14px; padding: 20px; }
+.ticket-verify-result-heading { display: flex; align-items: center; gap: 12px; padding-bottom: 17px; border-bottom: 1px solid var(--admin-border); }
+.ticket-verify-result-heading > div:nth-child(2) { min-width: 0; }
+.ticket-verify-result-heading strong, .ticket-verify-result-heading span { display: block; }
+.ticket-verify-result-heading strong { color: var(--admin-text); font-size: 13px; }
+.ticket-verify-result-heading span { margin-top: 5px; color: var(--admin-text-muted); font-size: 10px; }
+.ticket-verify-result-heading .status-badge { margin-left: auto; }
+.ticket-verify-result-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 15px; padding-top: 18px; }
+.ticket-verify-result-grid small, .ticket-verify-result-grid strong { display: block; }
+.ticket-verify-result-grid small { color: var(--admin-text-muted); font-size: 10px; }
+.ticket-verify-result-grid strong { overflow: hidden; margin-top: 7px; color: var(--admin-text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+
+.change-origin-card { display: flex; align-items: center; gap: 13px; margin-bottom: 16px; padding: 16px 18px; border: 1px solid var(--user-border); border-radius: 14px; background: var(--user-surface); }
+.change-origin-card > div:nth-child(2) { min-width: 0; flex: 1; }
+.change-origin-card strong, .change-origin-card span { display: block; }
+.change-origin-card strong { font-size: 14px; }
+.change-origin-card span { margin-top: 5px; overflow: hidden; color: var(--user-text-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.change-ticket-layout { display: grid; grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1.4fr) 250px; align-items: start; gap: 14px; }
+.change-session-panel, .change-seat-panel, .change-ticket-summary { min-width: 0; padding: 19px; border: 1px solid var(--user-border); border-radius: 14px; background: var(--user-surface); }
+.change-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.change-section-heading h2 { margin: 7px 0 0; font-size: 16px; }
+.change-section-heading > span { color: var(--user-text-muted); font-size: 10px; }
+.change-session-list { display: grid; gap: 8px; }
+.change-session-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 12px; border: 1px solid var(--user-border); border-radius: 9px; color: var(--user-text-secondary); background: transparent; text-align: left; }
+.change-session-option:hover, .change-session-option.active { border-color: var(--user-gold); background: var(--user-gold-soft); }
+.change-session-option > span { min-width: 0; }
+.change-session-option strong, .change-session-option small, .change-session-option b { display: block; }
+.change-session-option strong { color: var(--user-text); font-size: 11px; }
+.change-session-option small { margin-top: 5px; color: var(--user-text-muted); font-size: 10px; }
+.change-session-option > span:last-child { display: grid; justify-items: end; gap: 6px; }
+.change-session-option b { color: var(--user-gold); font-size: 12px; }
+.change-seat-panel { overflow: hidden; }
+.change-seat-map { overflow-x: auto; padding: 9px 0 0; }
+.change-seat-map .seat-map-wrap { min-width: 360px; }
+.change-seat-panel .seat-legend { margin-top: 18px; }
+.change-ticket-summary { display: grid; gap: 21px; }
+.change-ticket-summary .selected-seat-summary { padding-top: 0; border-top: 0; }
+.change-ticket-summary .summary-total { margin-top: 3px; }
+.ticket-code-used { color: var(--user-success); background: #e5f3e9; }
+
 .feedback-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; color: var(--user-text); background: var(--user-bg); text-align: center; }
 .feedback-page > svg { color: var(--user-gold); }
 .feedback-page h1 { margin: 8px 0 0; font-size: 32px; letter-spacing: -0.06em; }
@@ -671,6 +739,21 @@ img { max-width: 100%; display: block; }
   .booking-steps { gap: 12px; }
   .seat-legend { gap: 9px; }
   .seat-summary { padding: 17px; }
+}
+
+@media (max-width: 820px) {
+  .session-admin-card { grid-template-columns: 1fr auto; }
+  .session-admin-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .ticket-verify-layout, .change-ticket-layout { grid-template-columns: 1fr; }
+  .change-ticket-summary { order: -1; }
+}
+
+@media (max-width: 520px) {
+  .ticket-verify-form { grid-template-columns: 1fr; }
+  .ticket-verify-form .button { width: 100%; }
+  .ticket-verify-result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .change-origin-card { align-items: flex-start; flex-wrap: wrap; }
+  .change-origin-card .status-badge { margin-left: 55px; }
 }
 
 /* User product redesign: film editorial layout */

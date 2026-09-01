@@ -16,6 +16,21 @@ export function usePaymentQuery(orderNo: string) {
   return useServerQuery({ queryKey: ['payment', orderNo], queryFn: () => orderApi.payment(orderNo), fallback: () => ({ transactionNo: 'TX-DEMO-001', orderNo, amountCents: demoOrder.paidCents, channel: 'MOCK', status: 'SUCCESS' }), enabled: orderNo.length > 0, staleTime: 0, refetchInterval: 3000 })
 }
 
+export function useCancelOrderMutation(orderNo: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => orderApi.cancel(orderNo),
+    retry: false,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['order', orderNo] })
+      void queryClient.invalidateQueries({ queryKey: ['orders'] })
+      void queryClient.invalidateQueries({ queryKey: ['payment', orderNo] })
+      void queryClient.invalidateQueries({ queryKey: ['sessions'] })
+      void queryClient.invalidateQueries({ queryKey: ['seat-map'] })
+    },
+  })
+}
+
 export function useCreatePaymentMutation() {
   return useMutation({ mutationFn: (orderNo: string) => orderApi.createPayment(orderNo, randomUUID()), retry: false })
 }
@@ -37,8 +52,26 @@ export function useMockPayMutation() {
 export function useRefundMutation(orderNo: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (reason: string) => orderApi.refund(orderNo, reason, randomUUID()),
+    mutationFn: async (reason: string) => {
+      const refund = await orderApi.refund(orderNo, reason, randomUUID())
+      if (refund.status === 'PENDING') await orderApi.mockRefund(refund.refundNo)
+      return refund
+    },
     retry: false,
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['order', orderNo] }),
+  })
+}
+
+export function useChangeOrderMutation(orderNo: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: { new_session_id: number; new_seat_ids: number[] }) => orderApi.change(orderNo, payload, randomUUID()),
+    retry: false,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['order', orderNo] })
+      void queryClient.invalidateQueries({ queryKey: ['orders'] })
+      void queryClient.invalidateQueries({ queryKey: ['seat-map'] })
+      void queryClient.invalidateQueries({ queryKey: ['sessions'] })
+    },
   })
 }

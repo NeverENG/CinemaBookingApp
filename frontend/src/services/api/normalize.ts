@@ -1,4 +1,4 @@
-import type { AuthSession, Banner, CouponTemplate, DashboardCinemaRow, DashboardMovieRow, DashboardSummary, DashboardTrendRow, Hall, HomeView, Movie, Order, OrderItem, Payment, PointsLedger, PointsView, Refund, Seat, SeatMapView, Session } from '../../types'
+import type { AuthSession, Banner, ChangeTicketResult, CouponTemplate, DashboardCinemaRow, DashboardMovieRow, DashboardSummary, DashboardTrendRow, Hall, HomeView, Movie, Order, OrderItem, Payment, PointsLedger, PointsView, Refund, Seat, SeatMapView, Session, TicketVerification } from '../../types'
 
 type Raw = Record<string, unknown> | null | undefined
 
@@ -28,6 +28,7 @@ export function normalizeAuth(raw: Raw): AuthSession {
     token: string(raw, 'token', 'Token'),
     userId: number(raw, 'userId', 'user_id', 'UserID'),
     role: string(raw, 'role', 'Role') as AuthSession['role'],
+    cinemaId: number(raw, 'cinemaId', 'cinema_id', 'CinemaID') || undefined,
   }
 }
 
@@ -80,6 +81,7 @@ export function normalizeSession(raw: Raw): Session {
     startTime: string(raw, 'startTime', 'start_time', 'StartTime'),
     endTime: string(raw, 'endTime', 'end_time', 'EndTime'),
     basePriceCents: number(raw, 'basePriceCents', 'base_price_cents', 'BasePriceCents'),
+    priceRulesJson: string(raw, 'priceRulesJson', 'price_rules', 'price_rules_json', 'PriceRulesJSON'),
     status: string(raw, 'status', 'Status'),
     remainingSeats: number(raw, 'remainingSeats', 'remaining_seats', 'RemainingSeats'),
   }
@@ -94,6 +96,7 @@ export function normalizeSeat(raw: Raw): Seat {
     seatNo: string(raw, 'seatNo', 'seat_no', 'SeatNo'),
     type: string(raw, 'type', 'Type'),
     status: ['available', 'locked', 'booked', 'disabled'].includes(status) ? status : 'available',
+    priceCents: number(raw, 'priceCents', 'price_cents', 'PriceCents'),
   }
 }
 
@@ -148,6 +151,8 @@ export function normalizePayment(raw: Raw): Payment {
     amountCents: number(raw, 'amountCents', 'amount_cents', 'AmountCents'),
     channel: string(raw, 'channel', 'Channel'),
     status: string(raw, 'status', 'Status'),
+    paidAt: read<string | null>(raw, 'paidAt', 'paid_at', 'PaidAt'),
+    closedAt: read<string | null>(raw, 'closedAt', 'closed_at', 'ClosedAt'),
   }
 }
 
@@ -158,6 +163,28 @@ export function normalizeRefund(raw: Raw): Refund {
     amountCents: number(raw, 'amountCents', 'amount_cents', 'AmountCents'),
     reason: string(raw, 'reason', 'Reason'),
     status: string(raw, 'status', 'Status'),
+  }
+}
+
+export function normalizeTicketVerification(raw: Raw): TicketVerification {
+  return {
+    ticketNo: string(raw, 'ticketNo', 'ticket_no', 'TicketNo'),
+    orderNo: string(raw, 'orderNo', 'order_no', 'OrderNo'),
+    seatNo: string(raw, 'seatNo', 'seat_no', 'SeatNo'),
+    movieId: number(raw, 'movieId', 'movie_id', 'MovieID'),
+    cinemaId: number(raw, 'cinemaId', 'cinema_id', 'CinemaID'),
+    usedAt: string(raw, 'usedAt', 'used_at', 'UsedAt'),
+    orderStatus: string(raw, 'orderStatus', 'order_status', 'OrderStatus'),
+    alreadyUsed: boolean(raw, 'alreadyUsed', 'already_used', 'AlreadyUsed'),
+  }
+}
+
+export function normalizeChangeTicketResult(raw: Raw): ChangeTicketResult {
+  return {
+    newOrderNo: string(raw, 'newOrderNo', 'new_order_no', 'NewOrderNo'),
+    newPaidCents: number(raw, 'newPaidCents', 'new_paid_cents', 'NewPaidCents'),
+    refundNo: string(raw, 'refundNo', 'refund_no', 'RefundNo'),
+    refundAmountCents: number(raw, 'refundAmountCents', 'refund_amount_cents', 'RefundAmountCents'),
   }
 }
 

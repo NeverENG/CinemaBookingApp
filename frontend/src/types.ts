@@ -4,6 +4,7 @@ export interface AuthSession {
   token: string
   userId: number
   role: Role
+  cinemaId?: number
 }
 
 export interface Cinema {
@@ -53,6 +54,7 @@ export interface Session {
   startTime: string
   endTime: string
   basePriceCents: number
+  priceRulesJson?: string
   status: string
   remainingSeats?: number
 }
@@ -66,6 +68,7 @@ export interface Seat {
   seatNo: string
   type: string
   status: SeatStatus
+  priceCents?: number
 }
 
 export interface SeatMapView {
@@ -116,6 +119,8 @@ export interface Payment {
   amountCents: number
   channel: string
   status: string
+  paidAt?: string | null
+  closedAt?: string | null
 }
 
 export interface PointsLedger {
@@ -154,6 +159,24 @@ export interface Refund {
   amountCents: number
   reason: string
   status: string
+}
+
+export interface TicketVerification {
+  ticketNo: string
+  orderNo: string
+  seatNo: string
+  movieId: number
+  cinemaId: number
+  usedAt: string
+  orderStatus: string
+  alreadyUsed: boolean
+}
+
+export interface ChangeTicketResult {
+  newOrderNo: string
+  newPaidCents: number
+  refundNo: string
+  refundAmountCents: number
 }
 
 export interface Hall {

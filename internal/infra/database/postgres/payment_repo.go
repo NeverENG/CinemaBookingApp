@@ -83,13 +83,20 @@ func (r *PaymentRepo) ListPendingOlderThan(ctx context.Context, before time.Time
 }
 
 func (r *PaymentRepo) Transition(ctx context.Context, transactionNo string, from, to domain.PaymentStatus, version int32) error {
+	updates := map[string]any{
+		"status":  to,
+		"version": gorm.Expr("version + 1"),
+	}
+	if from == domain.PaymentPending && to == domain.PaymentSuccess {
+		updates["paid_at"] = time.Now()
+	}
+	if from == domain.PaymentPending && to == domain.PaymentClosed {
+		updates["closed_at"] = time.Now()
+	}
 	res := r.db.db(ctx).
 		Model(&paymentRow{}).
 		Where("transaction_no = ? AND status = ? AND version = ?", transactionNo, from, version).
-		Updates(map[string]any{
-			"status":  to,
-			"version": gorm.Expr("version + 1"),
-		})
+		Updates(updates)
 	if res.Error != nil {
 		return res.Error
 	}

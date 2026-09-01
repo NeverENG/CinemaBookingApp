@@ -119,6 +119,7 @@ func NewApp(cfg config.Config) (*App, error) {
 	refundSvc := service.NewRefundSvc(txm, orderRepo, refundRepo, paymentRepo, seatLockRepo, pointsRepo, sessionRepo, boxOfficeRepo)
 	boxOfficeSvc := service.NewBoxOfficeSvc(boxOfficeRepo)
 	changeSvc := service.NewChangeTicketSvc(orderRepo, sessionRepo, orderSvc, paymentSvc, refundSvc)
+	ticketVerificationSvc := service.NewTicketVerificationSvc(txm, orderRepo, orderRepo, operationLogRepo)
 	couponSvc := service.NewAdminCouponSvc(txm, couponRepo, userRepo, operationLogRepo)
 	adminUserSvc := service.NewAdminUserSvc(adminRepo, roleRepo, operationLogRepo)
 
@@ -135,13 +136,14 @@ func NewApp(cfg config.Config) (*App, error) {
 	refundHandler := handler.NewRefundHandler(refundSvc)
 	dashboardHandler := handler.NewDashboardHandler(boxOfficeSvc)
 	changeHandler := handler.NewChangeHandler(changeSvc)
+	ticketHandler := handler.NewTicketHandler(ticketVerificationSvc)
 	healthHandler := handler.NewHealthHandler(db)
 	couponHandler := handler.NewAdminCouponHandler(couponSvc)
 	adminUserHandler := handler.NewAdminUserHandler(adminUserSvc)
 	catalogHandler := handler.NewCatalogHandler(catalogSvc)
-	authMw := middleware.NewAuthMiddleware(tokens)
+	authMw := middleware.NewAuthMiddleware(tokens, userRepo, adminRepo, roleRepo)
 
-	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler, refundHandler, dashboardHandler, changeHandler, healthHandler, couponHandler, adminUserHandler, catalogHandler)
+	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler, refundHandler, dashboardHandler, changeHandler, healthHandler, couponHandler, adminUserHandler, catalogHandler, ticketHandler)
 
 	runner := job.NewRunner()
 	runner.Add("order_timeout", func(ctx context.Context) error {

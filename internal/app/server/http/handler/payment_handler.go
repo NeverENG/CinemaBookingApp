@@ -43,12 +43,17 @@ type paymentStatusResponse struct {
 
 // Create POST /api/v1/payments
 func (h *PaymentHandler) Create(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "invalid user")
+		return
+	}
 	var req createPaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	payment, err := h.payments.CreatePayment(c.Request.Context(), service.CreatePaymentInput{OrderNo: req.OrderNo})
+	payment, err := h.payments.CreatePayment(c.Request.Context(), service.CreatePaymentInput{UserID: userID, OrderNo: req.OrderNo})
 	if err != nil {
 		resp.Error(c, err)
 		return

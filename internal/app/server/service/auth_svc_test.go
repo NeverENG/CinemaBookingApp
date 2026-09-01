@@ -15,6 +15,15 @@ type fakeAdminRepo struct {
 	admins map[string]*domain.Admin
 }
 
+func (f *fakeAdminRepo) GetByID(ctx context.Context, id int64) (*domain.Admin, error) {
+	for _, admin := range f.admins {
+		if admin.ID == id {
+			return admin, nil
+		}
+	}
+	return nil, domain.ErrAdminNotFound
+}
+
 func (f *fakeAdminRepo) GetByUsername(ctx context.Context, username string) (*domain.Admin, error) {
 	if a, ok := f.admins[username]; ok {
 		return a, nil
@@ -32,6 +41,15 @@ func (f *fakeAdminRepo) Create(ctx context.Context, admin *domain.Admin) error {
 	}
 	admin.ID = int64(len(f.admins) + 1)
 	f.admins[admin.Username] = admin
+	return nil
+}
+
+func (f *fakeAdminRepo) UpdatePassword(ctx context.Context, adminID int64, passwordHash string) error {
+	admin, err := f.GetByID(ctx, adminID)
+	if err != nil {
+		return err
+	}
+	admin.PasswordHash = passwordHash
 	return nil
 }
 
@@ -217,7 +235,7 @@ func TestAdminLogin(t *testing.T) {
 		"admin": {ID: 1, Username: "admin", PasswordHash: hash, RoleID: 1, Status: "ACTIVE"},
 	}}
 	roles := &fakeRoleRepo{roles: map[string]*domain.Role{
-		domain.RoleSuperAdmin: {ID: 1, Code: domain.RoleSuperAdmin, Name: "超级管理员"},
+		domain.RoleSuperAdmin: {ID: 1, Code: domain.RoleSuperAdmin, Name: "超级管理员", Status: "ACTIVE"},
 	}}
 	svc := newAuthTestSvc(&fakeUserRepo{}, admins, roles)
 
@@ -233,7 +251,7 @@ func TestAdminLogin(t *testing.T) {
 func TestEnsureDefaultAdmin(t *testing.T) {
 	admins := &fakeAdminRepo{}
 	roles := &fakeRoleRepo{roles: map[string]*domain.Role{
-		domain.RoleSuperAdmin: {ID: 1, Code: domain.RoleSuperAdmin, Name: "超级管理员"},
+		domain.RoleSuperAdmin: {ID: 1, Code: domain.RoleSuperAdmin, Name: "超级管理员", Status: "ACTIVE"},
 	}}
 	svc := newAuthTestSvc(&fakeUserRepo{}, admins, roles)
 
@@ -405,7 +423,7 @@ func TestAdminLoginSuccessResetsGuard(t *testing.T) {
 		"admin": {ID: 1, Username: "admin", PasswordHash: hash, RoleID: 1, Status: "ACTIVE"},
 	}}
 	roles := &fakeRoleRepo{roles: map[string]*domain.Role{
-		domain.RoleSuperAdmin: {ID: 1, Code: domain.RoleSuperAdmin, Name: "超级管理员"},
+		domain.RoleSuperAdmin: {ID: 1, Code: domain.RoleSuperAdmin, Name: "超级管理员", Status: "ACTIVE"},
 	}}
 	guards := &fakeLoginGuardRepo{}
 	_, _ = guards.RecordFailure(context.Background(), loginScopeAdmin, "admin")

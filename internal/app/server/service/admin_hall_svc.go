@@ -36,7 +36,7 @@ func buildSeats(l *seatLayout) []domain.Seat {
 	}
 	seats := make([]domain.Seat, 0, l.Rows*l.Cols)
 	for row := 1; row <= l.Rows; row++ {
-		letter := string(rune('A' + row - 1))
+		letter := rowLabel(row)
 		for col := 1; col <= l.Cols; col++ {
 			no := fmt.Sprintf("%s%d", letter, col)
 			typ := "STANDARD"
@@ -59,6 +59,16 @@ func buildSeats(l *seatLayout) []domain.Seat {
 	return seats
 }
 
+func rowLabel(row int) string {
+	label := ""
+	for row > 0 {
+		row--
+		label = string(rune('A'+row%26)) + label
+		row /= 26
+	}
+	return label
+}
+
 // AdminHallSvc 影厅管理：保存布局时 diff 同步 seats。
 type AdminHallSvc struct {
 	halls port.HallRepo
@@ -77,7 +87,7 @@ type HallInput struct {
 }
 
 func (s *AdminHallSvc) Create(ctx context.Context, scope domain.AdminScope, in HallInput) (*domain.Hall, error) {
-	if scope.IsCinemaAdmin() && (scope.CinemaID == nil || *scope.CinemaID != in.CinemaID) {
+	if !scope.CanManageCinema(in.CinemaID) {
 		return nil, domain.ErrForbidden
 	}
 	layout, err := parseSeatLayout(in.SeatLayout)
@@ -111,8 +121,7 @@ func (s *AdminHallSvc) Update(ctx context.Context, scope domain.AdminScope, hall
 	if err != nil {
 		return nil, err
 	}
-	if scope.IsCinemaAdmin() &&
-		(scope.CinemaID == nil || *scope.CinemaID != hall.CinemaID || *scope.CinemaID != in.CinemaID) {
+	if hall.CinemaID != in.CinemaID || !scope.CanManageCinema(hall.CinemaID) {
 		return nil, domain.ErrForbidden
 	}
 	hall.Name = in.Name
@@ -130,10 +139,10 @@ func (s *AdminHallSvc) Update(ctx context.Context, scope domain.AdminScope, hall
 }
 
 func (s *AdminHallSvc) ListByCinema(ctx context.Context, scope domain.AdminScope, cinemaID int64) ([]domain.Hall, error) {
+	if scope.Role != domain.RoleSuperAdmin && !scope.CanManageCinema(cinemaID) {
+		return nil, domain.ErrForbidden
+	}
 	if scope.IsCinemaAdmin() {
-		if scope.CinemaID == nil {
-			return nil, domain.ErrForbidden
-		}
 		cinemaID = *scope.CinemaID
 	}
 	return s.halls.ListByCinema(ctx, cinemaID)

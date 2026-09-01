@@ -48,7 +48,7 @@ func TestRetryCallbacks(t *testing.T) {
 	callbacks := &fakeCallbackRepo{}
 	svc := newPaymentTestSvc(orders, payments, callbacks, &fakeSeatLockRepo{}, &fakeCouponRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeMembershipRepo{})
 
-	tx, _ := svc.CreatePayment(context.Background(), CreatePaymentInput{OrderNo: "O1"})
+	tx, _ := svc.CreatePayment(context.Background(), CreatePaymentInput{UserID: 1, OrderNo: "O1"})
 	callbacks.callbacks = map[string]*domain.PaymentCallback{
 		"E1": {EventID: "E1", TransactionNo: tx.TransactionNo, AmountCents: 10000, Status: domain.CallbackReceived},
 		"E2": {EventID: "E2", TransactionNo: "T-NOT-EXIST", AmountCents: 10000, Status: domain.CallbackReceived},

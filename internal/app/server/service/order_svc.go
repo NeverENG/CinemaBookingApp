@@ -72,6 +72,10 @@ func (s *OrderSvc) CreateOrder(ctx context.Context, in CreateOrderInput) (*domai
 		if !session.CanBook(time.Now()) {
 			return domain.ErrSessionNotBookable
 		}
+		priceRules, err := parsePriceRules(session.PriceRulesJSON)
+		if err != nil {
+			return err
+		}
 
 		seats, err := s.seats.ListSeatsByIDs(txCtx, in.SeatIDs)
 		if err != nil {
@@ -85,7 +89,11 @@ func (s *OrderSvc) CreateOrder(ctx context.Context, in CreateOrderInput) (*domai
 			if seat.HallID != session.HallID || seat.Status != seatStatusEnabled {
 				return domain.ErrSeatNotAvailable
 			}
-			prices = append(prices, session.BasePriceCents)
+			price, err := priceForSeat(session, priceRules, seat)
+			if err != nil {
+				return err
+			}
+			prices = append(prices, price)
 		}
 
 		couponDiscount := int64(0)
@@ -255,6 +263,9 @@ func (s *OrderSvc) CancelPending(ctx context.Context, userID int64, orderNo stri
 		}
 		if order.UserID != userID {
 			return domain.ErrForbidden
+		}
+		if order.Status == domain.OrderCanceled {
+			return nil
 		}
 		if order.Status != domain.OrderPendingPayment {
 			return domain.ErrInvalidTransition

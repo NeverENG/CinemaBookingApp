@@ -32,6 +32,11 @@ export function useCreateAdminMovieMutation() {
   return useMutation({ mutationFn: (payload: Record<string, unknown>) => adminApi.movies.create(payload), retry: false, onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['admin', 'movies'] }) })
 }
 
+export function useUpdateAdminMovieMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: (payload: { id: number; data: Record<string, unknown> }) => adminApi.movies.update(payload.id, payload.data), retry: false, onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['admin', 'movies'] }) })
+}
+
 export function useSetMovieStatusMutation() {
   const queryClient = useQueryClient()
   return useMutation({ mutationFn: (payload: { id: number; status: string }) => adminApi.movies.setStatus(payload.id, payload.status), retry: false, onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['admin', 'movies'] }) })
@@ -42,9 +47,24 @@ export function useCreateHallMutation() {
   return useMutation({ mutationFn: (payload: Record<string, unknown>) => adminApi.halls.create(payload), retry: false, onSuccess: (_, payload) => void queryClient.invalidateQueries({ queryKey: ['admin', 'halls', Number(payload.cinema_id)] }) })
 }
 
+export function useUpdateHallMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: (payload: { id: number; data: Record<string, unknown> }) => adminApi.halls.update(payload.id, payload.data), retry: false, onSuccess: (_, payload) => void queryClient.invalidateQueries({ queryKey: ['admin', 'halls', Number(payload.data.cinema_id)] }) })
+}
+
 export function useCreateSessionMutation() {
   const queryClient = useQueryClient()
   return useMutation({ mutationFn: (payload: Record<string, unknown>) => adminApi.sessions.create(payload), retry: false, onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['sessions'] }) })
+}
+
+export function useUpdateSessionPriceMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: (payload: { id: number; data: Record<string, unknown> }) => adminApi.sessions.updatePrice(payload.id, payload.data), retry: false, onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['sessions'] }) })
+}
+
+export function useCancelSessionMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: (id: number) => adminApi.sessions.cancel(id), retry: false, onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['sessions'] }) })
 }
 
 export function useCreateCouponMutation() {
@@ -59,6 +79,10 @@ export function useCreateBannerMutation() {
 
 export function useCreateAdminMutation() {
   return useMutation({ mutationFn: (payload: Record<string, unknown>) => adminApi.admins.create(payload), retry: false })
+}
+
+export function useVerifyTicketMutation() {
+  return useMutation({ mutationFn: (ticketNo: string) => adminApi.tickets.verify(ticketNo), retry: false })
 }
 
 export function useReconcileMutation() {

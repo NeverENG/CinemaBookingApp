@@ -47,7 +47,7 @@ func (h *AdminMovieHandler) Create(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	movie, err := h.movies.Create(c.Request.Context(), scope.AdminID, in)
+	movie, err := h.movies.Create(c.Request.Context(), scope, in)
 	if err != nil {
 		resp.Error(c, err)
 		return
@@ -85,7 +85,7 @@ func (h *AdminMovieHandler) Update(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	movie, err := h.movies.Update(c.Request.Context(), scope.AdminID, movieID, in)
+	movie, err := h.movies.Update(c.Request.Context(), scope, movieID, in)
 	if err != nil {
 		resp.Error(c, err)
 		return
@@ -116,7 +116,7 @@ func (h *AdminMovieHandler) SetStatus(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, "invalid status")
 		return
 	}
-	if err := h.movies.SetStatus(c.Request.Context(), scope.AdminID, movieID, status); err != nil {
+	if err := h.movies.SetStatus(c.Request.Context(), scope, movieID, status); err != nil {
 		resp.Error(c, err)
 		return
 	}

@@ -26,7 +26,10 @@ type BannerInput struct {
 	Enabled  bool
 }
 
-func (s *AdminBannerSvc) Create(ctx context.Context, adminID int64, in BannerInput) (*domain.Banner, error) {
+func (s *AdminBannerSvc) Create(ctx context.Context, scope domain.AdminScope, in BannerInput) (*domain.Banner, error) {
+	if scope.Role != domain.RoleSuperAdmin {
+		return nil, domain.ErrForbidden
+	}
 	banner := &domain.Banner{
 		Title:     in.Title,
 		ImageURL:  in.ImageURL,
@@ -40,10 +43,13 @@ func (s *AdminBannerSvc) Create(ctx context.Context, adminID int64, in BannerInp
 	if err := s.banners.Create(ctx, banner); err != nil {
 		return nil, err
 	}
-	return banner, s.log(ctx, adminID, "CREATE_BANNER", "banner", strconv.FormatInt(banner.ID, 10), banner)
+	return banner, s.log(ctx, scope.AdminID, "CREATE_BANNER", "banner", strconv.FormatInt(banner.ID, 10), banner)
 }
 
-func (s *AdminBannerSvc) Update(ctx context.Context, adminID, bannerID int64, in BannerInput) (*domain.Banner, error) {
+func (s *AdminBannerSvc) Update(ctx context.Context, scope domain.AdminScope, bannerID int64, in BannerInput) (*domain.Banner, error) {
+	if scope.Role != domain.RoleSuperAdmin {
+		return nil, domain.ErrForbidden
+	}
 	banner := &domain.Banner{
 		ID:       bannerID,
 		Title:    in.Title,
@@ -57,17 +63,23 @@ func (s *AdminBannerSvc) Update(ctx context.Context, adminID, bannerID int64, in
 	if err := s.banners.Update(ctx, banner); err != nil {
 		return nil, err
 	}
-	return banner, s.log(ctx, adminID, "UPDATE_BANNER", "banner", strconv.FormatInt(bannerID, 10), banner)
+	return banner, s.log(ctx, scope.AdminID, "UPDATE_BANNER", "banner", strconv.FormatInt(bannerID, 10), banner)
 }
 
-func (s *AdminBannerSvc) Delete(ctx context.Context, adminID, bannerID int64) error {
+func (s *AdminBannerSvc) Delete(ctx context.Context, scope domain.AdminScope, bannerID int64) error {
+	if scope.Role != domain.RoleSuperAdmin {
+		return domain.ErrForbidden
+	}
 	if err := s.banners.Delete(ctx, bannerID); err != nil {
 		return err
 	}
-	return s.log(ctx, adminID, "DELETE_BANNER", "banner", strconv.FormatInt(bannerID, 10), nil)
+	return s.log(ctx, scope.AdminID, "DELETE_BANNER", "banner", strconv.FormatInt(bannerID, 10), nil)
 }
 
-func (s *AdminBannerSvc) List(ctx context.Context) ([]domain.Banner, error) {
+func (s *AdminBannerSvc) List(ctx context.Context, scope domain.AdminScope) ([]domain.Banner, error) {
+	if scope.Role != domain.RoleSuperAdmin {
+		return nil, domain.ErrForbidden
+	}
 	return s.banners.List(ctx)
 }
 

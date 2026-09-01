@@ -17,7 +17,7 @@ export function AdminLayout() {
 
   function logout() {
     signOut()
-    navigate('/login?mode=admin')
+    navigate(session?.role === 'CINEMA_ADMIN' ? '/login?mode=cinema' : '/login?mode=platform')
   }
 
   return <div className="admin-shell">

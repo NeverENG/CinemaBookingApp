@@ -43,7 +43,7 @@ func (h *AdminCouponHandler) CreateTemplate(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	tpl, err := h.coupons.CreateTemplate(c.Request.Context(), scope.AdminID, service.CouponTemplateInput{
+	tpl, err := h.coupons.CreateTemplate(c.Request.Context(), scope, service.CouponTemplateInput{
 		Name: req.Name, Type: req.Type, ValueCents: req.ValueCents, PercentBp: req.PercentBp,
 		MinSpendCents: req.MinSpendCents, MaxDiscountCents: req.MaxDiscountCents, Redeemable: req.Redeemable,
 		RedeemPoints: req.RedeemPoints, ValidDays: req.ValidDays, TotalQty: req.TotalQty, PerUserLimit: req.PerUserLimit,
@@ -56,7 +56,12 @@ func (h *AdminCouponHandler) CreateTemplate(c *gin.Context) {
 }
 
 func (h *AdminCouponHandler) ListTemplates(c *gin.Context) {
-	templates, err := h.coupons.ListTemplates(c.Request.Context())
+	scope, ok := adminScopeFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "missing admin")
+		return
+	}
+	templates, err := h.coupons.ListTemplates(c.Request.Context(), scope)
 	if err != nil {
 		resp.Error(c, err)
 		return
@@ -82,7 +87,7 @@ func (h *AdminCouponHandler) SetTemplateStatus(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := h.coupons.SetTemplateStatus(c.Request.Context(), scope.AdminID, templateID, req.Status); err != nil {
+	if err := h.coupons.SetTemplateStatus(c.Request.Context(), scope, templateID, req.Status); err != nil {
 		resp.Error(c, err)
 		return
 	}
@@ -105,7 +110,7 @@ func (h *AdminCouponHandler) IssueToUser(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	coupon, err := h.coupons.IssueToUser(c.Request.Context(), scope.AdminID, req.UserID, req.TemplateID)
+	coupon, err := h.coupons.IssueToUser(c.Request.Context(), scope, req.UserID, req.TemplateID)
 	if err != nil {
 		resp.Error(c, err)
 		return

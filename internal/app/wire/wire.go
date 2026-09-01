@@ -11,6 +11,7 @@ import (
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/middleware"
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/router"
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/service"
+	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
 	"github.com/NeverENG/CinemaBookingApp/internal/infra/config"
 	"github.com/NeverENG/CinemaBookingApp/internal/infra/database/postgres"
 	"github.com/NeverENG/CinemaBookingApp/internal/pkg/jwt"
@@ -78,6 +79,7 @@ func NewApp(cfg config.Config) (*App, error) {
 	bannerRepo := postgres.NewBannerRepo(pg)
 	pointsRepo := postgres.NewPointsRepo(pg)
 	boxOfficeRepo := postgres.NewBoxOfficeRepo(pg)
+	emailVerificationRepo := postgres.NewEmailVerificationRepo(pg)
 	passwordResetRepo := postgres.NewPasswordResetRepo(pg)
 	membershipRepo := postgres.NewMembershipRepo(pg)
 	loginGuardRepo := postgres.NewLoginGuardRepo(pg)
@@ -91,17 +93,23 @@ func NewApp(cfg config.Config) (*App, error) {
 	orderSvc := service.NewOrderSvc(txm, userRepo, sessionRepo, seatRepo, seatLockRepo, couponRepo, orderRepo)
 	paymentSvc := service.NewPaymentSvc(txm, paymentRepo, callbackRepo, orderRepo, seatLockRepo, couponRepo, pointsRepo, boxOfficeRepo, membershipRepo)
 	authSvc := service.NewAuthSvc(
-		userRepo, adminRepo, roleRepo, tokens, loginGuardRepo,
+		txm, userRepo, adminRepo, roleRepo, tokens, loginGuardRepo,
 		service.Bootstrap{
-			AdminUsername: cfg.Admin.Username,
-			AdminPassword: cfg.Admin.Password,
-			DemoUsername:  cfg.Demo.Username,
-			DemoPassword:  cfg.Demo.Password,
+			AdminUsername:       cfg.Admin.Username,
+			AdminPassword:       cfg.Admin.Password,
+			CinemaAdminUsername: cfg.CinemaAdmin.Username,
+			CinemaAdminPassword: cfg.CinemaAdmin.Password,
+			CinemaAdminCinemaID: cfg.CinemaAdmin.CinemaID,
+			DemoUsername:        cfg.Demo.Username,
+			DemoPassword:        cfg.Demo.Password,
 		},
-		passwordResetRepo, membershipRepo, mailerCfg, mailerCfg.Enabled(),
+		emailVerificationRepo, passwordResetRepo, membershipRepo, mailerCfg, mailerCfg.Enabled(),
 	)
 	if err := authSvc.EnsureDefaultAdmin(context.Background()); err != nil {
 		log.Printf("ensure default admin: %v", err)
+	}
+	if err := authSvc.EnsureDefaultCinemaAdmin(context.Background()); err != nil {
+		log.Printf("ensure default cinema admin: %v", err)
 	}
 	if err := authSvc.EnsureDemoUser(context.Background()); err != nil {
 		log.Printf("ensure demo user: %v", err)
@@ -159,7 +167,7 @@ func NewApp(cfg config.Config) (*App, error) {
 		return err
 	})
 	runner.Add("box_office_reconcile", func(ctx context.Context) error {
-		return boxOfficeSvc.Reconcile(ctx)
+		return boxOfficeSvc.Reconcile(ctx, domain.AdminScope{Role: domain.RoleSuperAdmin})
 	})
 	runner.Add("reconcile_orders", func(ctx context.Context) error {
 		items, err := paymentSvc.Reconcile(ctx)
@@ -195,21 +203,28 @@ func EnsureBootstrap(cfg config.Config) error {
 		defer sqlDB.Close()
 	}
 	pg := postgres.NewDB(db)
+	txm := postgres.NewTxManager(pg)
 	userRepo := postgres.NewUserRepo(pg)
 	adminRepo := postgres.NewAdminRepo(pg)
 	roleRepo := postgres.NewRoleRepo(pg)
 	tokens := jwt.New(cfg.JWTSecret, cfg.JWTExpire)
 	authSvc := service.NewAuthSvc(
-		userRepo, adminRepo, roleRepo, tokens, postgres.NewLoginGuardRepo(pg),
+		txm, userRepo, adminRepo, roleRepo, tokens, postgres.NewLoginGuardRepo(pg),
 		service.Bootstrap{
-			AdminUsername: cfg.Admin.Username,
-			AdminPassword: cfg.Admin.Password,
-			DemoUsername:  cfg.Demo.Username,
-			DemoPassword:  cfg.Demo.Password,
+			AdminUsername:       cfg.Admin.Username,
+			AdminPassword:       cfg.Admin.Password,
+			CinemaAdminUsername: cfg.CinemaAdmin.Username,
+			CinemaAdminPassword: cfg.CinemaAdmin.Password,
+			CinemaAdminCinemaID: cfg.CinemaAdmin.CinemaID,
+			DemoUsername:        cfg.Demo.Username,
+			DemoPassword:        cfg.Demo.Password,
 		},
-		postgres.NewPasswordResetRepo(pg), postgres.NewMembershipRepo(pg), mailer.FromEnv(), false,
+		postgres.NewEmailVerificationRepo(pg), postgres.NewPasswordResetRepo(pg), postgres.NewMembershipRepo(pg), mailer.FromEnv(), false,
 	)
 	if err := authSvc.EnsureDefaultAdmin(context.Background()); err != nil {
+		return err
+	}
+	if err := authSvc.EnsureDefaultCinemaAdmin(context.Background()); err != nil {
 		return err
 	}
 	return authSvc.EnsureDemoUser(context.Background())

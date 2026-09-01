@@ -5,6 +5,7 @@ import { UserLayout } from '../../layouts/UserLayout'
 import { RequireAuth, RequireRole } from './guards'
 
 const LoginPage = lazy(() => import('../../pages/auth/LoginPage').then(({ LoginPage: page }) => ({ default: page })))
+const ForgotPasswordPage = lazy(() => import('../../pages/auth/ForgotPasswordPage').then(({ ForgotPasswordPage: page }) => ({ default: page })))
 const RegisterPage = lazy(() => import('../../pages/auth/RegisterPage').then(({ RegisterPage: page }) => ({ default: page })))
 const AdminsPage = lazy(() => import('../../pages/admin/AdminsPage').then(({ AdminsPage: page }) => ({ default: page })))
 const DashboardPage = lazy(() => import('../../pages/admin/DashboardPage').then(({ DashboardPage: page }) => ({ default: page })))
@@ -36,6 +37,7 @@ function lazyElement(Page: LazyPage) {
 
 export const router = createBrowserRouter([
   { path: '/login', element: lazyElement(LoginPage) },
+  { path: '/forgot-password', element: lazyElement(ForgotPasswordPage) },
   { path: '/register', element: lazyElement(RegisterPage) },
   { path: '/forbidden', element: lazyElement(ForbiddenPage) },
   {

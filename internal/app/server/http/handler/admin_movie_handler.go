@@ -56,7 +56,12 @@ func (h *AdminMovieHandler) Create(c *gin.Context) {
 }
 
 func (h *AdminMovieHandler) List(c *gin.Context) {
-	movies, err := h.movies.List(c.Request.Context())
+	scope, ok := adminScopeFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "missing admin")
+		return
+	}
+	movies, err := h.movies.List(c.Request.Context(), scope)
 	if err != nil {
 		resp.Error(c, err)
 		return

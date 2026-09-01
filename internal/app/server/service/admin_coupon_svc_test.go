@@ -12,7 +12,7 @@ func TestAdminCouponCreateTemplateInvalid(t *testing.T) {
 	coupons := &fakeCouponRepo{}
 	svc := NewAdminCouponSvc(fakeTxManager{}, coupons, &fakeUserRepo{}, &fakeOperationLogRepo{})
 
-	_, err := svc.CreateTemplate(context.Background(), 1, CouponTemplateInput{Name: "券", Type: "UNKNOWN"})
+	_, err := svc.CreateTemplate(context.Background(), superAdminScope, CouponTemplateInput{Name: "券", Type: "UNKNOWN"})
 	if !errors.Is(err, domain.ErrCouponNotAvailable) {
 		t.Fatalf("expected ErrCouponNotAvailable, got %v", err)
 	}
@@ -26,7 +26,7 @@ func TestAdminCouponCreateAndIssue(t *testing.T) {
 	logs := &fakeOperationLogRepo{}
 	svc := NewAdminCouponSvc(fakeTxManager{}, coupons, users, logs)
 
-	tpl, err := svc.CreateTemplate(context.Background(), 1, CouponTemplateInput{
+	tpl, err := svc.CreateTemplate(context.Background(), superAdminScope, CouponTemplateInput{
 		Name: "10元券", Type: domain.CouponTypeFixed, ValueCents: 1000, TotalQty: 100,
 	})
 	if err != nil {
@@ -36,7 +36,7 @@ func TestAdminCouponCreateAndIssue(t *testing.T) {
 		t.Fatalf("unexpected template: %+v", tpl)
 	}
 
-	coupon, err := svc.IssueToUser(context.Background(), 1, 1, tpl.ID)
+	coupon, err := svc.IssueToUser(context.Background(), superAdminScope, 1, tpl.ID)
 	if err != nil {
 		t.Fatalf("issue: %v", err)
 	}
@@ -45,5 +45,17 @@ func TestAdminCouponCreateAndIssue(t *testing.T) {
 	}
 	if len(coupons.instances) != 1 {
 		t.Fatal("expected instance created")
+	}
+}
+
+func TestAdminCouponRequiresSuperAdmin(t *testing.T) {
+	svc := NewAdminCouponSvc(fakeTxManager{}, &fakeCouponRepo{}, &fakeUserRepo{}, &fakeOperationLogRepo{})
+	scope := domain.AdminScope{AdminID: 2, Role: domain.RoleCinemaAdmin, CinemaID: int64Ptr(1)}
+
+	if _, err := svc.ListTemplates(context.Background(), scope); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+	if _, err := svc.CreateTemplate(context.Background(), scope, CouponTemplateInput{Name: "10元券", Type: domain.CouponTypeFixed, ValueCents: 1000}); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 }

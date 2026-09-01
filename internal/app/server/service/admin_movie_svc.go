@@ -93,7 +93,10 @@ func (s *AdminMovieSvc) SetStatus(ctx context.Context, scope domain.AdminScope, 
 	return s.log(ctx, scope.AdminID, "SET_MOVIE_STATUS", "movie", strconv.FormatInt(movieID, 10), map[string]string{"status": string(status)})
 }
 
-func (s *AdminMovieSvc) List(ctx context.Context) ([]domain.Movie, error) {
+func (s *AdminMovieSvc) List(ctx context.Context, scope domain.AdminScope) ([]domain.Movie, error) {
+	if scope.Role != domain.RoleSuperAdmin && scope.Role != domain.RoleCinemaAdmin {
+		return nil, domain.ErrForbidden
+	}
 	return s.movies.List(ctx)
 }
 

@@ -4,9 +4,12 @@ package mailer
 import (
 	"crypto/tls"
 	"fmt"
+	"mime"
+	"net"
 	"net/smtp"
 	"os"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -29,7 +32,7 @@ func FromEnv() Config {
 }
 
 func (c Config) Enabled() bool {
-	return c.Username != "" && c.Password != "" && c.From != ""
+	return c.Username != "" && c.Password != ""
 }
 
 // Send 发送一封纯文本邮件。
@@ -41,18 +44,22 @@ func (c Config) Send(to, subject, body string) error {
 	msg := strings.Join([]string{
 		"From: " + from,
 		"To: " + to,
-		"Subject: " + subject,
+		"Subject: " + mime.QEncoding.Encode("UTF-8", subject),
 		"Content-Type: text/plain; charset=UTF-8",
 		"",
 		body,
 		"",
 	}, "\r\n")
 
-	conn, err := tls.Dial("tcp", c.Host+":"+c.Port, &tls.Config{ServerName: c.Host})
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	conn, err := tls.DialWithDialer(dialer, "tcp", c.Host+":"+c.Port, &tls.Config{MinVersion: tls.VersionTLS12, ServerName: c.Host})
 	if err != nil {
 		return fmt.Errorf("smtp dial: %w", err)
 	}
 	defer conn.Close()
+	if err := conn.SetDeadline(time.Now().Add(15 * time.Second)); err != nil {
+		return fmt.Errorf("smtp deadline: %w", err)
+	}
 
 	client, err := smtp.NewClient(conn, c.Host)
 	if err != nil {

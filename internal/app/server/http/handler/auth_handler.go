@@ -36,8 +36,14 @@ type loginResponse struct {
 
 type registerRequest struct {
 	Email    string `json:"email" binding:"required"`
+	Code     string `json:"code" binding:"required"`
 	Password string `json:"password" binding:"required"`
 	Nickname string `json:"nickname" binding:"required"`
+}
+
+type verificationCodeResponse struct {
+	Status  string `json:"status"`
+	DevCode string `json:"dev_code,omitempty"`
 }
 
 // Register POST /api/v1/auth/register
@@ -47,12 +53,27 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	token, user, err := h.auth.Register(c.Request.Context(), req.Email, req.Password, req.Nickname)
+	token, user, err := h.auth.Register(c.Request.Context(), req.Email, req.Code, req.Password, req.Nickname)
 	if err != nil {
 		resp.Error(c, err)
 		return
 	}
 	resp.OK(c, loginResponse{Token: token, UserID: user.ID, Role: "USER"})
+}
+
+// RequestRegistrationCode POST /api/v1/auth/email-verification/request
+func (h *AuthHandler) RequestRegistrationCode(c *gin.Context) {
+	var req resetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	devCode, err := h.auth.RequestRegistrationCode(c.Request.Context(), req.Email)
+	if err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, verificationCodeResponse{Status: "ok", DevCode: devCode})
 }
 
 type changePasswordRequest struct {
@@ -95,7 +116,7 @@ func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
 		resp.Error(c, err)
 		return
 	}
-	resp.OK(c, gin.H{"status": "ok", "dev_code": devCode})
+	resp.OK(c, verificationCodeResponse{Status: "ok", DevCode: devCode})
 }
 
 type resetPasswordRequest struct {

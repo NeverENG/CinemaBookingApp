@@ -72,7 +72,10 @@ func (s *BoxOfficeSvc) Summary(ctx context.Context, scope domain.AdminScope, q D
 	})
 }
 
-func (s *BoxOfficeSvc) Reconcile(ctx context.Context) error {
+func (s *BoxOfficeSvc) Reconcile(ctx context.Context, scope domain.AdminScope) error {
+	if scope.Role != domain.RoleSuperAdmin {
+		return domain.ErrForbidden
+	}
 	return s.box.Rebuild(ctx)
 }
 

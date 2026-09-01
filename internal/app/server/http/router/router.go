@@ -39,6 +39,7 @@ func New(
 	v1.Use(middleware.RateLimit(middleware.NewTokenBucketLimiter(20, 40, 10*time.Minute), middleware.ClientIPKey))
 	{
 		v1.POST("/auth/login", authHandler.UserLogin)
+		v1.POST("/auth/email-verification/request", authHandler.RequestRegistrationCode)
 		v1.POST("/auth/register", authHandler.Register)
 		v1.POST("/auth/password-reset/request", authHandler.RequestPasswordReset)
 		v1.POST("/auth/password-reset/reset", authHandler.ResetPassword)

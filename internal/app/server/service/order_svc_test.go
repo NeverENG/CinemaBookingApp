@@ -293,7 +293,8 @@ func (f *fakeCouponRepo) MarkUsedByOrderNo(ctx context.Context, orderNo string) 
 }
 
 type fakeOrderRepo struct {
-	orders map[string]*domain.Order
+	orders                  map[string]*domain.Order
+	createdCouponInstanceID *int64
 }
 
 func (f *fakeOrderRepo) CreateOrder(ctx context.Context, order *domain.Order) error {
@@ -302,6 +303,10 @@ func (f *fakeOrderRepo) CreateOrder(ctx context.Context, order *domain.Order) er
 	}
 	if _, exists := f.orders[order.OrderNo]; exists {
 		return domain.ErrInvalidTransition
+	}
+	if order.CouponInstanceID != nil {
+		couponID := *order.CouponInstanceID
+		f.createdCouponInstanceID = &couponID
 	}
 	f.orders[order.OrderNo] = order
 	return nil
@@ -481,6 +486,9 @@ func TestCreateOrderWithCoupon(t *testing.T) {
 	}
 	if coupons.coupons["C001"].Status != domain.CouponLocked {
 		t.Fatal("expected coupon locked")
+	}
+	if orders.createdCouponInstanceID == nil || *orders.createdCouponInstanceID != 1 {
+		t.Fatalf("expected coupon instance persisted with order, got %v", orders.createdCouponInstanceID)
 	}
 }
 

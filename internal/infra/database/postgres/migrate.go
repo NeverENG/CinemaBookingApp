@@ -37,7 +37,7 @@ func ApplyAllMigrations(db *gorm.DB, dir string) error {
 func ApplyMigrations(db *gorm.DB, path string) error {
 	demoUsername := os.Getenv("DEMO_USERNAME")
 	if demoUsername == "" {
-		demoUsername = "demo"
+		demoUsername = "demo@lterm.test"
 	}
 	return ApplyMigrationsWithVars(db, path, map[string]string{"DEMO_USERNAME": demoUsername})
 }

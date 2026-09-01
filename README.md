@@ -115,9 +115,24 @@ make run
 默认演示账号可以通过 `.env` 修改：
 
 ```text
-管理员：admin / admin123
-用户：demo / demo123
+平台管理员：admin / admin123
+影院管理员：cinema_admin / cinema123（默认绑定影院 1）
+用户：demo@lterm.test / demo123
 ```
+
+### 邮箱验证码
+
+用户注册和忘记密码均使用 6 位邮箱验证码。使用 QQ 邮箱时，在 `.env` 配置：
+
+```text
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=465
+SMTP_USER=你的QQ邮箱
+SMTP_PASSWORD=QQ邮箱设置中生成的SMTP授权码
+SMTP_FROM=你的QQ邮箱
+```
+
+未配置 `SMTP_USER` / `SMTP_PASSWORD` 时，接口会返回开发验证码，前端会自动填入，便于本机和课程演示。
 
 ### 前端
 

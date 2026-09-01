@@ -172,6 +172,24 @@ func TestAdminMovieCreateInvalid(t *testing.T) {
 	}
 }
 
+func TestAdminMovieCinemaAdminIsReadOnly(t *testing.T) {
+	movies := &fakeMovieRepo{movies: map[int64]*domain.Movie{
+		1: {ID: 1, Title: "沙丘3", Status: domain.MovieOnSale},
+	}}
+	svc := NewAdminMovieSvc(movies, &fakeOperationLogRepo{})
+	scope := domain.AdminScope{AdminID: 2, Role: domain.RoleCinemaAdmin, CinemaID: int64Ptr(100)}
+
+	if listed, err := svc.List(context.Background(), scope); err != nil || len(listed) != 1 {
+		t.Fatalf("cinema admin should read movies: listed=%v err=%v", listed, err)
+	}
+	if _, err := svc.Create(context.Background(), scope, MovieInput{Title: "新片", DurationMinutes: 120}); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+	if _, err := svc.List(context.Background(), domain.AdminScope{AdminID: 3, Role: domain.RoleFinance}); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("finance should not use movie admin service: %v", err)
+	}
+}
+
 func TestAdminHallCreateSyncsSeats(t *testing.T) {
 	halls := &fakeHallRepo{}
 	seats := &fakeSeatRepo{}

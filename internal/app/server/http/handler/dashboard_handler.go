@@ -101,7 +101,12 @@ func (h *DashboardHandler) Summary(c *gin.Context) {
 
 // Reconcile POST /api/v1/dashboard/box-office/reconcile（由 ledger 重建聚合）
 func (h *DashboardHandler) Reconcile(c *gin.Context) {
-	if err := h.box.Reconcile(c.Request.Context()); err != nil {
+	scope, ok := adminScopeFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "missing admin")
+		return
+	}
+	if err := h.box.Reconcile(c.Request.Context(), scope); err != nil {
 		resp.Error(c, err)
 		return
 	}

@@ -137,6 +137,10 @@ func (s *OrderSvc) CreateOrder(ctx context.Context, in CreateOrderInput) (*domai
 			Version:   1,
 			CreatedAt: now,
 		}
+		if coupon != nil {
+			couponID := coupon.ID
+			order.CouponInstanceID = &couponID
+		}
 		if err := order.Settle(total, discount, couponAmt); err != nil {
 			return err
 		}
@@ -181,8 +185,6 @@ func (s *OrderSvc) CreateOrder(ctx context.Context, in CreateOrderInput) (*domai
 			if err := s.coupons.LockForOrder(txCtx, coupon.CouponNo, order.OrderNo); err != nil {
 				return err
 			}
-			couponID := coupon.ID
-			order.CouponInstanceID = &couponID
 		}
 		return nil
 	})
@@ -239,10 +241,8 @@ func (s *OrderSvc) ExpireOverdueOrders(ctx context.Context, now time.Time) (int,
 			if err := s.sessions.RecalcStatus(txCtx, order.SessionID); err != nil {
 				return err
 			}
-			if order.CouponInstanceID != nil {
-				if err := s.coupons.UnlockByOrderNo(txCtx, order.OrderNo); err != nil {
-					return err
-				}
+			if err := s.coupons.UnlockByOrderNo(txCtx, order.OrderNo); err != nil {
+				return err
 			}
 			return nil
 		})
@@ -282,10 +282,8 @@ func (s *OrderSvc) CancelPending(ctx context.Context, userID int64, orderNo stri
 		if err := s.sessions.RecalcStatus(txCtx, order.SessionID); err != nil {
 			return err
 		}
-		if order.CouponInstanceID != nil {
-			if err := s.coupons.UnlockByOrderNo(txCtx, orderNo); err != nil {
-				return err
-			}
+		if err := s.coupons.UnlockByOrderNo(txCtx, orderNo); err != nil {
+			return err
 		}
 		return nil
 	})

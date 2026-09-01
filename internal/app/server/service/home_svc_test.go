@@ -114,11 +114,23 @@ func TestAdminBannerCreateInvalid(t *testing.T) {
 	logs := &fakeOperationLogRepo{}
 	svc := NewAdminBannerSvc(banners, logs)
 
-	_, err := svc.Create(context.Background(), 1, BannerInput{})
+	_, err := svc.Create(context.Background(), superAdminScope, BannerInput{})
 	if !errors.Is(err, domain.ErrBannerInvalid) {
 		t.Fatalf("expected ErrBannerInvalid, got %v", err)
 	}
 	if len(logs.logs) != 0 {
 		t.Fatal("invalid create should not log")
+	}
+}
+
+func TestAdminBannerRequiresSuperAdmin(t *testing.T) {
+	svc := NewAdminBannerSvc(&fakeBannerRepo{}, &fakeOperationLogRepo{})
+	scope := domain.AdminScope{AdminID: 2, Role: domain.RoleCinemaAdmin, CinemaID: int64Ptr(1)}
+
+	if _, err := svc.List(context.Background(), scope); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+	if _, err := svc.Create(context.Background(), scope, BannerInput{Title: "首页", ImageURL: "https://example.com/banner.jpg"}); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 }

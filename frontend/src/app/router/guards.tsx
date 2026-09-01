@@ -13,7 +13,7 @@ export function RequireAuth() {
 
 export function RequireRole({ roles, children }: { roles: Role[]; children?: React.ReactNode }) {
   const { session } = useAuth()
-  if (!session) return <Navigate to="/login?mode=admin" replace />
+  if (!session) return <Navigate to="/login?mode=platform" replace />
   if (!isAdminRole(session.role) || !roles.includes(session.role)) return <Navigate to="/forbidden" replace />
   return children ?? <Outlet />
 }

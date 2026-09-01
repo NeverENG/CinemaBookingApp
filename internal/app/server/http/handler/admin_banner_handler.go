@@ -36,7 +36,7 @@ func (h *AdminBannerHandler) Create(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	banner, err := h.banners.Create(c.Request.Context(), scope.AdminID, toBannerInput(req))
+	banner, err := h.banners.Create(c.Request.Context(), scope, toBannerInput(req))
 	if err != nil {
 		resp.Error(c, err)
 		return
@@ -45,7 +45,12 @@ func (h *AdminBannerHandler) Create(c *gin.Context) {
 }
 
 func (h *AdminBannerHandler) List(c *gin.Context) {
-	banners, err := h.banners.List(c.Request.Context())
+	scope, ok := adminScopeFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "missing admin")
+		return
+	}
+	banners, err := h.banners.List(c.Request.Context(), scope)
 	if err != nil {
 		resp.Error(c, err)
 		return
@@ -69,7 +74,7 @@ func (h *AdminBannerHandler) Update(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	banner, err := h.banners.Update(c.Request.Context(), scope.AdminID, bannerID, toBannerInput(req))
+	banner, err := h.banners.Update(c.Request.Context(), scope, bannerID, toBannerInput(req))
 	if err != nil {
 		resp.Error(c, err)
 		return
@@ -88,7 +93,7 @@ func (h *AdminBannerHandler) Delete(c *gin.Context) {
 		resp.Fail(c, http.StatusBadRequest, "invalid banner id")
 		return
 	}
-	if err := h.banners.Delete(c.Request.Context(), scope.AdminID, bannerID); err != nil {
+	if err := h.banners.Delete(c.Request.Context(), scope, bannerID); err != nil {
 		resp.Error(c, err)
 		return
 	}

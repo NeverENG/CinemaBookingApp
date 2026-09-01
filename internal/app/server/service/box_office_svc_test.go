@@ -74,3 +74,15 @@ func TestDashboardSuperAdminKeepsFilter(t *testing.T) {
 		t.Fatalf("expected cinema 7 kept, got %d", box.lastFilter.CinemaID)
 	}
 }
+
+func TestBoxOfficeReconcileRequiresSuperAdmin(t *testing.T) {
+	svc := NewBoxOfficeSvc(&fakeBoxOfficeRepo{})
+	scope := domain.AdminScope{AdminID: 2, Role: domain.RoleCinemaAdmin, CinemaID: int64Ptr(5)}
+
+	if err := svc.Reconcile(context.Background(), scope); err != domain.ErrForbidden {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+	if err := svc.Reconcile(context.Background(), superAdminScope); err != nil {
+		t.Fatalf("super admin reconcile: %v", err)
+	}
+}

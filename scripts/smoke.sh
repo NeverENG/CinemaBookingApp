@@ -2,7 +2,7 @@
 set -eu
 
 base_url="${1:-http://127.0.0.1:${APP_PORT:-8088}}"
-demo_username="${DEMO_USERNAME:-demo}"
+demo_username="${DEMO_USERNAME:-demo@lterm.test}"
 demo_password="${DEMO_PASSWORD:-demo123}"
 
 check_ok() {

@@ -9,13 +9,14 @@ import (
 )
 
 type Config struct {
-	DB        DB
-	HTTPAddr  string
-	GINMode   string
-	JWTSecret string
-	JWTExpire time.Duration
-	Admin     Admin
-	Demo      Demo
+	DB          DB
+	HTTPAddr    string
+	GINMode     string
+	JWTSecret   string
+	JWTExpire   time.Duration
+	Admin       Admin
+	CinemaAdmin CinemaAdmin
+	Demo        Demo
 }
 
 // DB 数据库连接配置；DSNOverride 设置时优先使用完整 DSN。
@@ -40,6 +41,12 @@ type Demo struct {
 	Password string
 }
 
+type CinemaAdmin struct {
+	Username string
+	Password string
+	CinemaID int64
+}
+
 // Load 从环境变量读取配置；未设置时使用本机开发默认值。
 func Load() Config {
 	return Config{
@@ -58,11 +65,16 @@ func Load() Config {
 		JWTSecret: env("JWT_SECRET", "dev-secret"),
 		JWTExpire: time.Duration(envInt("JWT_EXPIRE_HOURS", 24)) * time.Hour,
 		Admin: Admin{
-			Username: env("ADMIN_USERNAME", "admin"),
+			Username: strings.ToLower(strings.TrimSpace(env("ADMIN_USERNAME", "admin"))),
 			Password: env("ADMIN_PASSWORD", "admin123"),
 		},
+		CinemaAdmin: CinemaAdmin{
+			Username: strings.ToLower(strings.TrimSpace(env("CINEMA_ADMIN_USERNAME", "cinema_admin"))),
+			Password: env("CINEMA_ADMIN_PASSWORD", "cinema123"),
+			CinemaID: int64(envInt("CINEMA_ADMIN_CINEMA_ID", 1)),
+		},
 		Demo: Demo{
-			Username: env("DEMO_USERNAME", "demo"),
+			Username: strings.ToLower(strings.TrimSpace(env("DEMO_USERNAME", "demo@lterm.test"))),
 			Password: env("DEMO_PASSWORD", "demo123"),
 		},
 	}

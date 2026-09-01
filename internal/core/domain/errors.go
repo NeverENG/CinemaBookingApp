@@ -54,7 +54,9 @@ var (
 	ErrChangeMovieMismatch = errors.New("change ticket must be same movie")
 	ErrChangeSeatCount     = errors.New("change ticket seat count mismatch")
 
-	ErrEmailNotRegistered = errors.New("email not registered")
-	ErrResetCodeInvalid   = errors.New("reset code invalid or expired")
-	ErrAccountLocked      = errors.New("account locked, try again later")
+	ErrEmailNotRegistered      = errors.New("email not registered")
+	ErrEmailNotVerified        = errors.New("email not verified")
+	ErrResetCodeInvalid        = errors.New("reset code invalid or expired")
+	ErrVerificationCodeInvalid = errors.New("verification code invalid or expired")
+	ErrAccountLocked           = errors.New("account locked, try again later")
 )

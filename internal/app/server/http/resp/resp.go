@@ -59,15 +59,19 @@ func Error(c *gin.Context, err error) {
 		errors.Is(err, domain.ErrInvalidInput):
 		Fail(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, domain.ErrUsernameTaken):
-		Fail(c, http.StatusConflict, err.Error())
+		Fail(c, http.StatusConflict, "该邮箱或账号已存在")
 	case errors.Is(err, domain.ErrEmailNotRegistered):
-		Fail(c, http.StatusNotFound, err.Error())
+		Fail(c, http.StatusNotFound, "该邮箱尚未注册")
 	case errors.Is(err, domain.ErrResetCodeInvalid):
-		Fail(c, http.StatusBadRequest, err.Error())
+		Fail(c, http.StatusBadRequest, "验证码错误或已过期")
+	case errors.Is(err, domain.ErrVerificationCodeInvalid):
+		Fail(c, http.StatusBadRequest, "验证码错误或已过期")
 	case errors.Is(err, domain.ErrInvalidCredentials):
-		Fail(c, http.StatusUnauthorized, err.Error())
+		Fail(c, http.StatusUnauthorized, "账号或密码错误")
+	case errors.Is(err, domain.ErrEmailNotVerified):
+		Fail(c, http.StatusForbidden, "邮箱尚未验证")
 	case errors.Is(err, domain.ErrAccountLocked):
-		Fail(c, http.StatusLocked, err.Error())
+		Fail(c, http.StatusLocked, "尝试次数过多，请稍后再试")
 	case errors.Is(err, domain.ErrRefundNotFound):
 		Fail(c, http.StatusNotFound, err.Error())
 	case errors.Is(err, domain.ErrForbidden):

@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type passwordResetCodeRow struct {
+type emailVerificationCodeRow struct {
 	ID        int64      `gorm:"column:id;primaryKey"`
 	Email     string     `gorm:"column:email"`
 	CodeHash  string     `gorm:"column:code_hash"`
@@ -19,41 +19,45 @@ type passwordResetCodeRow struct {
 	CreatedAt time.Time  `gorm:"column:created_at"`
 }
 
-func (passwordResetCodeRow) TableName() string { return "password_reset_codes" }
+func (emailVerificationCodeRow) TableName() string { return "email_verification_codes" }
 
-// PasswordResetRepo 实现 port.PasswordResetRepo。
-type PasswordResetRepo struct {
+type EmailVerificationRepo struct {
 	db *DB
 }
 
-var _ port.PasswordResetRepo = (*PasswordResetRepo)(nil)
+var _ port.EmailVerificationRepo = (*EmailVerificationRepo)(nil)
 
-func NewPasswordResetRepo(db *DB) *PasswordResetRepo {
-	return &PasswordResetRepo{db: db}
+func NewEmailVerificationRepo(db *DB) *EmailVerificationRepo {
+	return &EmailVerificationRepo{db: db}
 }
 
-func (r *PasswordResetRepo) Create(ctx context.Context, code *domain.PasswordResetCode) error {
-	return r.db.db(ctx).Create(&passwordResetCodeRow{
+func (r *EmailVerificationRepo) Create(ctx context.Context, code *domain.EmailVerificationCode) error {
+	row := &emailVerificationCodeRow{
 		Email:     code.Email,
 		CodeHash:  code.CodeHash,
 		ExpiresAt: code.ExpiresAt,
 		CreatedAt: time.Now(),
-	}).Error
+	}
+	if err := r.db.db(ctx).Create(row).Error; err != nil {
+		return err
+	}
+	code.ID = row.ID
+	return nil
 }
 
-func (r *PasswordResetRepo) FindUnusedByEmail(ctx context.Context, email string) (*domain.PasswordResetCode, error) {
-	var row passwordResetCodeRow
+func (r *EmailVerificationRepo) FindUnusedByEmail(ctx context.Context, email string) (*domain.EmailVerificationCode, error) {
+	var row emailVerificationCodeRow
 	err := r.db.db(ctx).
 		Where("email = ? AND used_at IS NULL AND expires_at > ?", email, time.Now()).
 		Order("id DESC").
 		First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, domain.ErrResetCodeInvalid
+		return nil, domain.ErrVerificationCodeInvalid
 	}
 	if err != nil {
 		return nil, err
 	}
-	return &domain.PasswordResetCode{
+	return &domain.EmailVerificationCode{
 		ID:        row.ID,
 		Email:     row.Email,
 		CodeHash:  row.CodeHash,
@@ -62,17 +66,16 @@ func (r *PasswordResetRepo) FindUnusedByEmail(ctx context.Context, email string)
 	}, nil
 }
 
-func (r *PasswordResetRepo) MarkUsed(ctx context.Context, id int64) error {
-	now := time.Now()
+func (r *EmailVerificationRepo) MarkUsed(ctx context.Context, id int64) error {
 	result := r.db.db(ctx).
-		Model(&passwordResetCodeRow{}).
+		Model(&emailVerificationCodeRow{}).
 		Where("id = ? AND used_at IS NULL", id).
-		Update("used_at", now)
+		Update("used_at", time.Now())
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected != 1 {
-		return domain.ErrResetCodeInvalid
+		return domain.ErrVerificationCodeInvalid
 	}
 	return nil
 }

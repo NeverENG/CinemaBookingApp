@@ -5,7 +5,7 @@ VALUES (1, '星海影城', '上海', '浦东新区测试路 1 号', 121.47, 31.2
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO movies (id, title, cover_url, trailer_url, description, duration_minutes, genre, release_date, rating, status)
-VALUES (1, '沙丘3', 'https://picsum.photos/seed/movie1/400/600', '', '演示影片', 166, '科幻', '2026-08-01', 8.8, 'ON_SALE')
+VALUES (1, '沙丘3', '/posters/dune-3.jpg', '', '演示影片', 166, '科幻', '2026-08-01', 8.8, 'ON_SALE')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO halls (id, cinema_id, name, seat_layout_json, status)

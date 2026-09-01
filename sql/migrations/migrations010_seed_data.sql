@@ -6,9 +6,9 @@ VALUES (2, '环球影城', '北京', '朝阳区演示路 2 号', 116.40, 39.90, 
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO movies (id, title, cover_url, trailer_url, description, duration_minutes, genre, release_date, rating, status) VALUES
-    (2, '流浪地球3', 'https://picsum.photos/seed/movie2/400/600', '', '演示影片', 173, '科幻', '2026-07-15', 9.1, 'ON_SALE'),
-    (3, '哪吒2', 'https://picsum.photos/seed/movie3/400/600', '', '演示影片', 144, '动画', '2026-08-10', 9.4, 'ON_SALE'),
-    (4, '疯狂动物城2', 'https://picsum.photos/seed/movie4/400/600', '', '演示影片', 128, '动画', '2026-08-20', 8.6, 'ON_SALE')
+    (2, '流浪地球3', '/posters/wandering-earth-3.jpg', '', '演示影片', 173, '科幻', '2026-07-15', 9.1, 'ON_SALE'),
+    (3, '哪吒2', '/posters/nezha-2.jpg', '', '演示影片', 144, '动画', '2026-08-10', 9.4, 'ON_SALE'),
+    (4, '疯狂动物城2', '/posters/zootopia-2.jpg', '', '演示影片', 128, '动画', '2026-08-20', 8.6, 'ON_SALE')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO halls (id, cinema_id, name, seat_layout_json, status) VALUES

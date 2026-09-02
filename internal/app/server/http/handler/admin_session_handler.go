@@ -7,16 +7,49 @@ import (
 
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/http/resp"
 	"github.com/NeverENG/CinemaBookingApp/internal/app/server/service"
+	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
 	"github.com/gin-gonic/gin"
 )
 
 // AdminSessionHandler 场次管理 HTTP 层。
 type AdminSessionHandler struct {
 	sessions *service.AdminSessionSvc
+	views    *service.SeatMapSvc
 }
 
-func NewAdminSessionHandler(sessions *service.AdminSessionSvc) *AdminSessionHandler {
-	return &AdminSessionHandler{sessions: sessions}
+func NewAdminSessionHandler(sessions *service.AdminSessionSvc, views *service.SeatMapSvc) *AdminSessionHandler {
+	return &AdminSessionHandler{sessions: sessions, views: views}
+}
+
+// List GET /api/v1/admin/sessions?cinema_id=
+func (h *AdminSessionHandler) List(c *gin.Context) {
+	scope, ok := adminScopeFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "missing admin")
+		return
+	}
+	cinemaID := int64(0)
+	if raw := c.Query("cinema_id"); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed <= 0 {
+			resp.Fail(c, http.StatusBadRequest, "invalid cinema id")
+			return
+		}
+		cinemaID = parsed
+	}
+	if scope.Role == domain.RoleCinemaAdmin {
+		if scope.CinemaID == nil || (cinemaID > 0 && *scope.CinemaID != cinemaID) {
+			resp.Fail(c, http.StatusForbidden, "forbidden")
+			return
+		}
+		cinemaID = *scope.CinemaID
+	}
+	sessions, err := h.views.ListSessions(c.Request.Context(), 0, cinemaID)
+	if err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, sessions)
 }
 
 type sessionRequest struct {

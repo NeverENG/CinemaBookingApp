@@ -6,7 +6,7 @@
 ## 1. Potentia 的架构一句话
 
 **Monorepo + Clean Architecture + Modular Monolith**：
-
+d
 - `internal/core`：纯业务领域，不依赖任何外部实现。
 - `internal/infra`：外部实现（数据库、配置、日志、外部服务）。
 - `internal/app`：业务流程编排（server 的 HTTP/service/biz、job 任务）。
@@ -31,7 +31,7 @@ lterm/
 │   │   │   ├── order_item.go          #     订单明细（票）
 │   │   │   ├── payment.go             #     支付交易 + 回调实体
 │   │   │   ├── refund.go              #     退款单实体
-│   │   │   ├── seat_lock.go           #     座位锁实体
+│   │   │   ├── seat_lock.dgo           #     座位锁实体
 │   │   │   ├── coupon.go              #     优惠券模板/实例
 │   │   │   ├── points.go              #     积分流水
 │   │   │   ├── member.go              #     会员等级

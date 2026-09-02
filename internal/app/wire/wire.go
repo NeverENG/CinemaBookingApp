@@ -136,7 +136,7 @@ func NewApp(cfg config.Config) (*App, error) {
 	authHandler := handler.NewAuthHandler(authSvc)
 	movieHandler := handler.NewAdminMovieHandler(movieSvc)
 	hallHandler := handler.NewAdminHallHandler(hallSvc)
-	sessionHandler := handler.NewAdminSessionHandler(sessionSvc)
+	sessionHandler := handler.NewAdminSessionHandler(sessionSvc, seatMapSvc)
 	userSessionHandler := handler.NewSessionHandler(seatMapSvc)
 	homeHandler := handler.NewHomeHandler(homeSvc)
 	bannerHandler := handler.NewAdminBannerHandler(bannerSvc)

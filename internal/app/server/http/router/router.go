@@ -95,6 +95,7 @@ func New(
 			admin.POST("/coupons/issue", authMw.Admin(domain.RoleSuperAdmin), couponHandler.IssueToUser)
 			admin.GET("/admins", authMw.Admin(domain.RoleSuperAdmin), adminUserHandler.List)
 			admin.POST("/admins", authMw.Admin(domain.RoleSuperAdmin), adminUserHandler.Create)
+			admin.GET("/sessions", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), sessionHandler.List)
 			admin.POST("/tickets/verify", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), ticketHandler.Verify)
 
 			dashboard := admin.Group("/dashboard", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin, domain.RoleFinance))

@@ -1,6 +1,6 @@
 import { http } from '../http/client'
-import { demoCoupons, demoDashboardCinemas, demoDashboardMovies, demoDashboardSummary, demoDashboardTrend, demoHalls, demoMovies } from '../../demo'
-import type { AdminAccount, Banner, CouponTemplate, DashboardCinemaRow, DashboardMovieRow, DashboardSummary, DashboardTrendRow, Hall, Movie, TicketVerification } from '../../types'
+import { demoCoupons, demoDashboardCinemas, demoDashboardMovies, demoDashboardSummary, demoDashboardTrend, demoHalls, demoMovies, demoSessions } from '../../demo'
+import type { AdminAccount, Banner, CouponTemplate, DashboardCinemaRow, DashboardMovieRow, DashboardSummary, DashboardTrendRow, Hall, Movie, Session, TicketVerification } from '../../types'
 import { normalizeAdminAccount, normalizeBanner, normalizeCinemaRanking, normalizeCoupon, normalizeHall, normalizeMovie, normalizeMovieRanking, normalizeSession, normalizeSummary, normalizeTicketVerification, normalizeTrend } from './normalize'
 
 type Query = Record<string, string | number | undefined>
@@ -23,6 +23,7 @@ export const adminApi = {
     update: async (id: number, payload: Record<string, unknown>) => normalizeHall(await http.patch(`/admin/halls/${id}`, payload).then((response) => response.data)),
   },
   sessions: {
+    list: async (cinemaId?: number): Promise<Session[]> => rawList(await http.get('/admin/sessions', { params: { cinema_id: cinemaId } }).then((response) => response.data)).map(normalizeSession),
     create: async (payload: Record<string, unknown>) => normalizeSession(await http.post('/admin/sessions', payload).then((response) => response.data)),
     updatePrice: (id: number, payload: Record<string, unknown>) => http.patch(`/admin/sessions/${id}/price`, payload).then((response) => response.data),
     cancel: (id: number) => http.post(`/admin/sessions/${id}/cancel`).then((response) => response.data),
@@ -58,6 +59,7 @@ export const adminFallbacks = {
   admins: () => [],
   movies: () => demoMovies,
   halls: () => demoHalls,
+  sessions: (cinemaId?: number) => demoSessions.filter((session) => !cinemaId || session.cinemaId === cinemaId),
   coupons: () => demoCoupons,
   dashboard: {
     summary: () => demoDashboardSummary,

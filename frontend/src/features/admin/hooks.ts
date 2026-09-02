@@ -10,6 +10,10 @@ export function useAdminHallsQuery(cinemaId: number) {
   return useServerQuery({ queryKey: ['admin', 'halls', cinemaId], queryFn: () => adminApi.halls.list(cinemaId), fallback: adminFallbacks.halls, enabled: cinemaId > 0, staleTime: 30_000 })
 }
 
+export function useAdminSessionsQuery(cinemaId: number) {
+  return useServerQuery({ queryKey: ['admin', 'sessions', cinemaId], queryFn: () => adminApi.sessions.list(cinemaId), fallback: () => adminFallbacks.sessions(cinemaId), enabled: cinemaId > 0, staleTime: 30_000 })
+}
+
 export function useAdminCouponsQuery() {
   return useServerQuery({ queryKey: ['admin', 'coupons'], queryFn: adminApi.coupons.list, fallback: adminFallbacks.coupons, staleTime: 30_000 })
 }
@@ -58,17 +62,26 @@ export function useUpdateHallMutation() {
 
 export function useCreateSessionMutation() {
   const queryClient = useQueryClient()
-  return useMutation({ mutationFn: (payload: Record<string, unknown>) => adminApi.sessions.create(payload), retry: false, onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['sessions'] }) })
+  return useMutation({ mutationFn: (payload: Record<string, unknown>) => adminApi.sessions.create(payload), retry: false, onSuccess: () => {
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'sessions'] })
+    void queryClient.invalidateQueries({ queryKey: ['sessions'] })
+  } })
 }
 
 export function useUpdateSessionPriceMutation() {
   const queryClient = useQueryClient()
-  return useMutation({ mutationFn: (payload: { id: number; data: Record<string, unknown> }) => adminApi.sessions.updatePrice(payload.id, payload.data), retry: false, onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['sessions'] }) })
+  return useMutation({ mutationFn: (payload: { id: number; data: Record<string, unknown> }) => adminApi.sessions.updatePrice(payload.id, payload.data), retry: false, onSuccess: () => {
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'sessions'] })
+    void queryClient.invalidateQueries({ queryKey: ['sessions'] })
+  } })
 }
 
 export function useCancelSessionMutation() {
   const queryClient = useQueryClient()
-  return useMutation({ mutationFn: (id: number) => adminApi.sessions.cancel(id), retry: false, onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['sessions'] }) })
+  return useMutation({ mutationFn: (id: number) => adminApi.sessions.cancel(id), retry: false, onSuccess: () => {
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'sessions'] })
+    void queryClient.invalidateQueries({ queryKey: ['sessions'] })
+  } })
 }
 
 export function useCreateCouponMutation() {

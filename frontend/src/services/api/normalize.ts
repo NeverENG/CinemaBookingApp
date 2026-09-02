@@ -79,6 +79,9 @@ export function normalizeCinema(raw: Raw) {
     city: string(raw, 'city', 'City'),
     address: string(raw, 'address', 'Address'),
     distanceKm: number(raw, 'distanceKm', 'distance_km', 'DistanceKm'),
+    status: string(raw, 'status', 'Status'),
+    longitude: number(raw, 'longitude', 'Longitude'),
+    latitude: number(raw, 'latitude', 'Latitude'),
   }
 }
 

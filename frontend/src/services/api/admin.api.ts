@@ -1,7 +1,7 @@
 import { http } from '../http/client'
 import { demoCoupons, demoDashboardCinemas, demoDashboardMovies, demoDashboardSummary, demoDashboardTrend, demoHalls, demoMovies, demoSessions } from '../../demo'
-import type { AdminAccount, Banner, CouponTemplate, DashboardCinemaRow, DashboardMovieRow, DashboardSummary, DashboardTrendRow, Hall, Movie, Session, TicketVerification } from '../../types'
-import { normalizeAdminAccount, normalizeBanner, normalizeCinemaRanking, normalizeCoupon, normalizeHall, normalizeMovie, normalizeMovieRanking, normalizeSession, normalizeSummary, normalizeTicketVerification, normalizeTrend } from './normalize'
+import type { AdminAccount, Banner, Cinema, CouponTemplate, DashboardCinemaRow, DashboardMovieRow, DashboardSummary, DashboardTrendRow, Hall, Movie, Session, TicketVerification } from '../../types'
+import { normalizeAdminAccount, normalizeBanner, normalizeCinema, normalizeCinemaRanking, normalizeCoupon, normalizeHall, normalizeMovie, normalizeMovieRanking, normalizeSession, normalizeSummary, normalizeTicketVerification, normalizeTrend } from './normalize'
 
 type Query = Record<string, string | number | undefined>
 type Raw = Record<string, unknown>
@@ -42,6 +42,12 @@ export const adminApi = {
   admins: {
     list: async (): Promise<AdminAccount[]> => rawList(await http.get('/admin/admins').then((response) => response.data)).map(normalizeAdminAccount),
     create: (payload: Record<string, unknown>) => http.post('/admin/admins', payload).then((response) => response.data),
+  },
+  cinemas: {
+    list: async (): Promise<Cinema[]> => rawList(await http.get('/admin/cinemas').then((response) => response.data)).map(normalizeCinema),
+    create: async (payload: Record<string, unknown>) => normalizeCinema(await http.post('/admin/cinemas', payload).then((response) => response.data)),
+    update: async (id: number, payload: Record<string, unknown>) => normalizeCinema(await http.patch(`/admin/cinemas/${id}`, payload).then((response) => response.data)),
+    setStatus: (id: number, status: string) => http.patch(`/admin/cinemas/${id}/status`, { status }).then((response) => response.data),
   },
   tickets: {
     verify: async (ticketNo: string): Promise<TicketVerification> => normalizeTicketVerification(await http.post('/admin/tickets/verify', { ticket_no: ticketNo }).then((response) => response.data)),

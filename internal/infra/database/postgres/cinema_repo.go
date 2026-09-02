@@ -66,6 +66,49 @@ func (r *CinemaRepo) List(ctx context.Context, keyword, city string) ([]domain.C
 	return cinemas, nil
 }
 
+func (r *CinemaRepo) ListAll(ctx context.Context) ([]domain.Cinema, error) {
+	var rows []cinemaRow
+	if err := r.db.db(ctx).Order("city, name, id").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	result := make([]domain.Cinema, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, *toDomainCinema(row))
+	}
+	return result, nil
+}
+
+func (r *CinemaRepo) Create(ctx context.Context, cinema *domain.Cinema) error {
+	row := &cinemaRow{Name: cinema.Name, City: cinema.City, Address: cinema.Address, Longitude: cinema.Longitude, Latitude: cinema.Latitude, Status: cinema.Status}
+	if err := r.db.db(ctx).Create(row).Error; err != nil {
+		return err
+	}
+	cinema.ID, cinema.CreatedAt = row.ID, row.CreatedAt
+	return nil
+}
+
+func (r *CinemaRepo) Update(ctx context.Context, cinema *domain.Cinema) error {
+	result := r.db.db(ctx).Model(&cinemaRow{}).Where("id = ?", cinema.ID).Updates(map[string]any{"name": cinema.Name, "city": cinema.City, "address": cinema.Address, "longitude": cinema.Longitude, "latitude": cinema.Latitude})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return domain.ErrCinemaNotFound
+	}
+	return nil
+}
+
+func (r *CinemaRepo) SetStatus(ctx context.Context, id int64, status domain.CinemaStatus) error {
+	result := r.db.db(ctx).Model(&cinemaRow{}).Where("id = ?", id).Update("status", status)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return domain.ErrCinemaNotFound
+	}
+	return nil
+}
+
 func toDomainCinema(row cinemaRow) *domain.Cinema {
 	return &domain.Cinema{
 		ID:        row.ID,

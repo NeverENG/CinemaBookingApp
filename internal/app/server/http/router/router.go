@@ -28,6 +28,7 @@ func New(
 	healthHandler *handler.HealthHandler,
 	couponHandler *handler.AdminCouponHandler,
 	adminUserHandler *handler.AdminUserHandler,
+	adminCinemaHandler *handler.AdminCinemaHandler,
 	catalogHandler *handler.CatalogHandler,
 	ticketHandler *handler.TicketHandler,
 ) *gin.Engine {
@@ -95,6 +96,10 @@ func New(
 			admin.POST("/coupons/issue", authMw.Admin(domain.RoleSuperAdmin), couponHandler.IssueToUser)
 			admin.GET("/admins", authMw.Admin(domain.RoleSuperAdmin), adminUserHandler.List)
 			admin.POST("/admins", authMw.Admin(domain.RoleSuperAdmin), adminUserHandler.Create)
+			admin.GET("/cinemas", authMw.Admin(domain.RoleSuperAdmin), adminCinemaHandler.List)
+			admin.POST("/cinemas", authMw.Admin(domain.RoleSuperAdmin), adminCinemaHandler.Create)
+			admin.PATCH("/cinemas/:id", authMw.Admin(domain.RoleSuperAdmin), adminCinemaHandler.Update)
+			admin.PATCH("/cinemas/:id/status", authMw.Admin(domain.RoleSuperAdmin), adminCinemaHandler.SetStatus)
 			admin.GET("/sessions", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), sessionHandler.List)
 			admin.POST("/tickets/verify", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), ticketHandler.Verify)
 

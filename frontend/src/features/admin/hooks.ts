@@ -25,6 +25,10 @@ export function useAdminBannersQuery() {
 export function useAdminAccountsQuery() {
   return useServerQuery({ queryKey: ['admin', 'admins'], queryFn: adminApi.admins.list, fallback: adminFallbacks.admins, staleTime: 30_000 })
 }
+export function useAdminCinemasQuery() { return useServerQuery({ queryKey: ['admin', 'cinemas'], queryFn: adminApi.cinemas.list, fallback: () => [], staleTime: 30_000 }) }
+export function useCreateCinemaMutation() { const q=useQueryClient(); return useMutation({ mutationFn:(p:Record<string,unknown>)=>adminApi.cinemas.create(p), retry:false, onSuccess:()=>{void q.invalidateQueries({queryKey:['admin','cinemas']});void q.invalidateQueries({queryKey:['cinemas']})} }) }
+export function useUpdateCinemaMutation() { const q=useQueryClient(); return useMutation({ mutationFn:(p:{id:number;data:Record<string,unknown>})=>adminApi.cinemas.update(p.id,p.data), retry:false, onSuccess:()=>{void q.invalidateQueries({queryKey:['admin','cinemas']});void q.invalidateQueries({queryKey:['cinemas']})} }) }
+export function useSetCinemaStatusMutation() { const q=useQueryClient(); return useMutation({ mutationFn:(p:{id:number;status:string})=>adminApi.cinemas.setStatus(p.id,p.status), retry:false, onSuccess:()=>{void q.invalidateQueries({queryKey:['admin','cinemas']});void q.invalidateQueries({queryKey:['cinemas']})} }) }
 
 export function useDashboardQueries(params: Record<string, string | number | undefined>) {
   return {

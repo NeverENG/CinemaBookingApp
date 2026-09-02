@@ -13,6 +13,9 @@ export interface Cinema {
   city: string
   address: string
   distanceKm?: number
+  status?: string
+  longitude?: number
+  latitude?: number
 }
 
 export interface AdminAccount {

@@ -6,7 +6,7 @@ import { useAuth } from '../app/providers'
 import { adminNavItems, canAccess } from '../app/router/route-registry'
 import { Avatar } from '../components/ui'
 
-const icons = { dashboard: LayoutDashboard, movies: Clapperboard, halls: Armchair, sessions: Ticket, tickets: BadgeCheck, marketing: Megaphone, admins: UsersRound }
+const icons = { dashboard: LayoutDashboard, movies: Clapperboard, halls: Armchair, sessions: Ticket, tickets: BadgeCheck, marketing: Megaphone, admins: UsersRound, cinemas: Clapperboard }
 
 export function AdminLayout() {
   const { session, signOut } = useAuth()

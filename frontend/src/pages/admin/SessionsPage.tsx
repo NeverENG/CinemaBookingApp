@@ -85,6 +85,7 @@ export function SessionsPage() {
   const updatePrice = useUpdateSessionPriceMutation()
   const cancel = useCancelSessionMutation()
   const sessions = useMemo(() => query.data ?? [], [query.data])
+  const selectedMovie = movies.find((movie) => String(movie.id) === form.movie_id)
 
   useEffect(() => {
     if (boundCinemaId > 0 && cinemaId !== boundCinemaId) {
@@ -97,6 +98,16 @@ export function SessionsPage() {
   useEffect(() => {
     if (movies.length > 0 && !movies.some((movie) => String(movie.id) === form.movie_id)) setForm((current) => ({ ...current, movie_id: String(movies[0].id) }))
   }, [form.movie_id, movies])
+
+  useEffect(() => {
+    if (!form.start_time || !selectedMovie?.durationMinutes) return
+    const start = new Date(form.start_time)
+    if (Number.isNaN(start.getTime())) return
+    const end = new Date(start.getTime() + selectedMovie.durationMinutes * 60_000)
+    const offset = end.getTimezoneOffset()
+    const endLocal = new Date(end.getTime() - offset * 60_000).toISOString().slice(0, 16)
+    if (endLocal !== form.end_time) setForm((current) => ({ ...current, end_time: endLocal }))
+  }, [form.end_time, form.start_time, selectedMovie])
 
   useEffect(() => {
     if (halls.length > 0 && !halls.some((hall) => String(hall.id) === form.hall_id)) setForm((current) => ({ ...current, hall_id: String(halls[0].id) }))
@@ -120,13 +131,10 @@ export function SessionsPage() {
     event.preventDefault()
     setFeedback(null)
     const startTime = new Date(form.start_time)
-    const endTime = new Date(form.end_time)
-    if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+    const duration = selectedMovie?.durationMinutes || 120
+    const endTime = new Date(startTime.getTime() + duration * 60_000)
+    if (Number.isNaN(startTime.getTime())) {
       setFeedback({ kind: 'error', message: '请填写有效的开始和结束时间' })
-      return
-    }
-    if (!(endTime.getTime() > startTime.getTime())) {
-      setFeedback({ kind: 'error', message: '结束时间必须晚于开始时间' })
       return
     }
     try {

@@ -8,6 +8,7 @@ const LoginPage = lazy(() => import('../../pages/auth/LoginPage').then(({ LoginP
 const ForgotPasswordPage = lazy(() => import('../../pages/auth/ForgotPasswordPage').then(({ ForgotPasswordPage: page }) => ({ default: page })))
 const RegisterPage = lazy(() => import('../../pages/auth/RegisterPage').then(({ RegisterPage: page }) => ({ default: page })))
 const AdminsPage = lazy(() => import('../../pages/admin/AdminsPage').then(({ AdminsPage: page }) => ({ default: page })))
+const CinemasAdminPage = lazy(() => import('../../pages/admin/CinemasAdminPage').then(({ CinemasAdminPage: page }) => ({ default: page })))
 const DashboardPage = lazy(() => import('../../pages/admin/DashboardPage').then(({ DashboardPage: page }) => ({ default: page })))
 const HallsPage = lazy(() => import('../../pages/admin/HallsPage').then(({ HallsPage: page }) => ({ default: page })))
 const MarketingPage = lazy(() => import('../../pages/admin/MarketingPage').then(({ MarketingPage: page }) => ({ default: page })))
@@ -73,6 +74,7 @@ export const router = createBrowserRouter([
       { path: 'tickets', element: <RequireRole roles={['SUPER_ADMIN', 'CINEMA_ADMIN']}>{lazyElement(TicketsPage)}</RequireRole> },
       { path: 'marketing', element: <RequireRole roles={['SUPER_ADMIN']}>{lazyElement(MarketingPage)}</RequireRole> },
       { path: 'admins', element: <RequireRole roles={['SUPER_ADMIN']}>{lazyElement(AdminsPage)}</RequireRole> },
+      { path: 'cinemas', element: <RequireRole roles={['SUPER_ADMIN']}>{lazyElement(CinemasAdminPage)}</RequireRole> },
       { path: 'profile', element: <RequireRole roles={['SUPER_ADMIN', 'CINEMA_ADMIN', 'FINANCE']}>{lazyElement(ProfilePage)}</RequireRole> },
     ],
   },

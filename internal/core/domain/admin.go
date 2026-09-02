@@ -1,5 +1,7 @@
 package domain
 
+import "time"
+
 // Admin 管理员。
 type Admin struct {
 	ID           int64
@@ -9,7 +11,9 @@ type Admin struct {
 	RoleID       int64
 	RoleCode     string
 	CinemaID     *int64 // SUPER_ADMIN 为空；CINEMA_ADMIN 绑定影院
+	CinemaName   string
 	Status       string
+	CreatedAt    time.Time
 }
 
 // AdminScope 由 JWT 注入的当前管理员上下文，服务层用它做数据隔离。

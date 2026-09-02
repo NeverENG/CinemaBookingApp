@@ -1,7 +1,7 @@
 import { http } from '../http/client'
 import { demoCoupons, demoDashboardCinemas, demoDashboardMovies, demoDashboardSummary, demoDashboardTrend, demoHalls, demoMovies } from '../../demo'
-import type { Banner, CouponTemplate, DashboardCinemaRow, DashboardMovieRow, DashboardSummary, DashboardTrendRow, Hall, Movie, TicketVerification } from '../../types'
-import { normalizeBanner, normalizeCinemaRanking, normalizeCoupon, normalizeHall, normalizeMovie, normalizeMovieRanking, normalizeSession, normalizeSummary, normalizeTicketVerification, normalizeTrend } from './normalize'
+import type { AdminAccount, Banner, CouponTemplate, DashboardCinemaRow, DashboardMovieRow, DashboardSummary, DashboardTrendRow, Hall, Movie, TicketVerification } from '../../types'
+import { normalizeAdminAccount, normalizeBanner, normalizeCinemaRanking, normalizeCoupon, normalizeHall, normalizeMovie, normalizeMovieRanking, normalizeSession, normalizeSummary, normalizeTicketVerification, normalizeTrend } from './normalize'
 
 type Query = Record<string, string | number | undefined>
 type Raw = Record<string, unknown>
@@ -39,6 +39,7 @@ export const adminApi = {
     setStatus: (id: number, status: string) => http.patch(`/admin/coupons/templates/${id}/status`, { status }).then((response) => response.data),
   },
   admins: {
+    list: async (): Promise<AdminAccount[]> => rawList(await http.get('/admin/admins').then((response) => response.data)).map(normalizeAdminAccount),
     create: (payload: Record<string, unknown>) => http.post('/admin/admins', payload).then((response) => response.data),
   },
   tickets: {
@@ -54,6 +55,7 @@ export const adminApi = {
 }
 
 export const adminFallbacks = {
+  admins: () => [],
   movies: () => demoMovies,
   halls: () => demoHalls,
   coupons: () => demoCoupons,

@@ -29,6 +29,45 @@ type CreateAdminInput struct {
 	CinemaID *int64
 }
 
+type AdminAccountView struct {
+	ID         int64  `json:"id"`
+	Username   string `json:"username"`
+	Nickname   string `json:"nickname"`
+	Role       string `json:"role"`
+	CinemaID   *int64 `json:"cinema_id,omitempty"`
+	CinemaName string `json:"cinema_name,omitempty"`
+	Status     string `json:"status"`
+	CreatedAt  string `json:"created_at"`
+}
+
+func (s *AdminUserSvc) List(ctx context.Context, scope domain.AdminScope) ([]AdminAccountView, error) {
+	if scope.Role != domain.RoleSuperAdmin {
+		return nil, domain.ErrForbidden
+	}
+	admins, err := s.admins.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]AdminAccountView, 0, len(admins))
+	for _, admin := range admins {
+		createdAt := ""
+		if !admin.CreatedAt.IsZero() {
+			createdAt = admin.CreatedAt.Format("2006-01-02T15:04:05Z07:00")
+		}
+		views = append(views, AdminAccountView{
+			ID:         admin.ID,
+			Username:   admin.Username,
+			Nickname:   admin.Nickname,
+			Role:       admin.RoleCode,
+			CinemaID:   admin.CinemaID,
+			CinemaName: admin.CinemaName,
+			Status:     admin.Status,
+			CreatedAt:  createdAt,
+		})
+	}
+	return views, nil
+}
+
 func (s *AdminUserSvc) Create(ctx context.Context, scope domain.AdminScope, in CreateAdminInput) (*domain.Admin, error) {
 	if scope.Role != domain.RoleSuperAdmin {
 		return nil, domain.ErrForbidden

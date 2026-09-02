@@ -1,4 +1,4 @@
-import type { AuthSession, Banner, ChangeTicketResult, CouponTemplate, DashboardCinemaRow, DashboardMovieRow, DashboardSummary, DashboardTrendRow, Hall, HomeView, Movie, Order, OrderItem, Payment, PointsLedger, PointsView, Refund, Seat, SeatMapView, Session, TicketVerification } from '../../types'
+import type { AdminAccount, AuthSession, Banner, ChangeTicketResult, CouponTemplate, DashboardCinemaRow, DashboardMovieRow, DashboardSummary, DashboardTrendRow, Hall, HomeView, Movie, Order, OrderItem, Payment, PointsLedger, PointsView, Refund, Seat, SeatMapView, Session, TicketVerification } from '../../types'
 
 type Raw = Record<string, unknown> | null | undefined
 
@@ -29,6 +29,19 @@ export function normalizeAuth(raw: Raw): AuthSession {
     userId: number(raw, 'userId', 'user_id', 'UserID'),
     role: string(raw, 'role', 'Role') as AuthSession['role'],
     cinemaId: number(raw, 'cinemaId', 'cinema_id', 'CinemaID') || undefined,
+  }
+}
+
+export function normalizeAdminAccount(raw: Raw): AdminAccount {
+  return {
+    id: number(raw, 'id', 'ID'),
+    username: string(raw, 'username', 'Username'),
+    nickname: string(raw, 'nickname', 'Nickname'),
+    role: string(raw, 'role', 'Role', 'roleCode', 'role_code', 'RoleCode') as AdminAccount['role'],
+    cinemaId: number(raw, 'cinemaId', 'cinema_id', 'CinemaID') || undefined,
+    cinemaName: string(raw, 'cinemaName', 'cinema_name', 'CinemaName') || undefined,
+    status: string(raw, 'status', 'Status'),
+    createdAt: string(raw, 'createdAt', 'created_at', 'CreatedAt'),
   }
 }
 

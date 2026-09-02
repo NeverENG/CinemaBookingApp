@@ -93,6 +93,7 @@ func New(
 			admin.GET("/coupons/templates", authMw.Admin(domain.RoleSuperAdmin), couponHandler.ListTemplates)
 			admin.PATCH("/coupons/templates/:id/status", authMw.Admin(domain.RoleSuperAdmin), couponHandler.SetTemplateStatus)
 			admin.POST("/coupons/issue", authMw.Admin(domain.RoleSuperAdmin), couponHandler.IssueToUser)
+			admin.GET("/admins", authMw.Admin(domain.RoleSuperAdmin), adminUserHandler.List)
 			admin.POST("/admins", authMw.Admin(domain.RoleSuperAdmin), adminUserHandler.Create)
 			admin.POST("/tickets/verify", authMw.Admin(domain.RoleSuperAdmin, domain.RoleCinemaAdmin), ticketHandler.Verify)
 

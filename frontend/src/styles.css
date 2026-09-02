@@ -578,13 +578,18 @@ img { max-width: 100%; display: block; }
 .empty-admin { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; color: var(--admin-text-muted); border: 1px dashed var(--admin-border); border-radius: 10px; }
 .empty-admin strong { color: var(--admin-text-secondary); font-size: 13px; }
 .empty-admin span { font-size: 10px; }
-.admin-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
-.admin-info-card { padding: 20px; border: 1px solid var(--admin-border); background: var(--admin-surface); border-radius: 11px; }
-.admin-info-card svg { color: var(--admin-gold); }
-.admin-info-card strong, .admin-info-card span { display: block; }
-.admin-info-card strong { margin-top: 15px; color: var(--admin-text); font-size: 13px; }
-.admin-info-card span { margin-top: 6px; color: var(--admin-text-muted); font-size: 10px; line-height: 1.5; }
-.admin-notice { padding: 14px; border: 1px solid rgba(212, 175, 101, 0.2); color: var(--admin-text-secondary); background: rgba(212, 175, 101, 0.05); border-radius: 8px; font-size: 11px; }
+.admin-account-table { min-width: 850px; }
+.admin-account { display: flex; align-items: center; gap: 10px; }
+.admin-account strong, .admin-account span, .admin-cinema-cell strong, .admin-cinema-cell span { display: block; }
+.admin-account strong, .admin-cinema-cell strong { color: var(--admin-text); font-size: 12px; }
+.admin-account span, .admin-cinema-cell span { margin-top: 4px; color: var(--admin-text-muted); font-size: 10px; }
+.admin-cinema-cell { display: flex; align-items: center; gap: 9px; }
+.admin-cinema-cell > svg { flex: 0 0 auto; color: var(--admin-gold); }
+.admin-role-label { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border: 1px solid var(--admin-border); border-radius: 5px; color: var(--admin-text-secondary); background: var(--admin-surface-raised); font-size: 10px; white-space: nowrap; }
+.admin-role-label.role-super-admin { border-color: rgba(212, 175, 101, 0.3); color: var(--admin-gold); }
+.admin-table-empty { display: grid; justify-items: center; gap: 7px; padding: 35px 20px; color: var(--admin-text-muted); text-align: center; }
+.admin-table-empty strong { color: var(--admin-text-secondary); font-size: 12px; }
+.admin-table-empty span { font-size: 10px; }
 .mobile-menu, .mobile-close { display: none; }
 
 .session-admin-card { grid-template-columns: 110px minmax(0, 1fr) 120px 110px auto; }
@@ -713,7 +718,7 @@ img { max-width: 100%; display: block; }
   .admin-main { width: min(100% - 32px, 620px); padding-top: 28px; }
   .filter-fields { flex-wrap: wrap; }
   .filter-fields .field { flex: 1 1 140px; }
-  .dashboard-grid, .dashboard-grid-bottom, .admin-info-grid { grid-template-columns: 1fr; }
+  .dashboard-grid, .dashboard-grid-bottom { grid-template-columns: 1fr; }
   .hall-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .session-admin-card { grid-template-columns: 1fr auto; }
   .session-admin-price, .session-admin-status { justify-self: start; }
@@ -744,6 +749,19 @@ img { max-width: 100%; display: block; }
   .booking-steps { gap: 12px; }
   .seat-legend { gap: 9px; }
   .seat-summary { padding: 17px; }
+}
+
+@media (max-width: 640px) {
+  .admin-account-table { display: block; min-width: 0; }
+  .admin-account-table thead { display: none; }
+  .admin-account-table tbody { display: grid; }
+  .admin-account-table .admin-account-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 12px; padding: 16px; border-bottom: 1px solid var(--admin-border); }
+  .admin-account-table .admin-account-row:last-child { border-bottom: 0; }
+  .admin-account-table .admin-account-row td { display: block; min-width: 0; padding: 0; border: 0; }
+  .admin-account-table .admin-account-row td:first-child { grid-column: 1 / -1; padding-bottom: 13px; border-bottom: 1px solid var(--admin-border); }
+  .admin-account-table .admin-account-row td::before { content: attr(data-label); display: block; margin-bottom: 7px; color: var(--admin-text-muted); font-size: 9px; }
+  .admin-account-table .admin-account-row td:first-child::before { display: none; }
+  .admin-account-table .admin-cinema-cell { align-items: flex-start; }
 }
 
 @media (max-width: 820px) {

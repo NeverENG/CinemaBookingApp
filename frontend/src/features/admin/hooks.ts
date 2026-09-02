@@ -18,6 +18,10 @@ export function useAdminBannersQuery() {
   return useServerQuery({ queryKey: ['admin', 'banners'], queryFn: adminApi.banners.list, fallback: () => [], staleTime: 30_000 })
 }
 
+export function useAdminAccountsQuery() {
+  return useServerQuery({ queryKey: ['admin', 'admins'], queryFn: adminApi.admins.list, fallback: adminFallbacks.admins, staleTime: 30_000 })
+}
+
 export function useDashboardQueries(params: Record<string, string | number | undefined>) {
   return {
     summary: useServerQuery({ queryKey: ['admin', 'dashboard', 'summary', params], queryFn: () => adminApi.dashboard.summary(params), fallback: adminFallbacks.dashboard.summary, staleTime: 30_000 }),
@@ -78,7 +82,8 @@ export function useCreateBannerMutation() {
 }
 
 export function useCreateAdminMutation() {
-  return useMutation({ mutationFn: (payload: Record<string, unknown>) => adminApi.admins.create(payload), retry: false })
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: (payload: Record<string, unknown>) => adminApi.admins.create(payload), retry: false, onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['admin', 'admins'] }) })
 }
 
 export function useVerifyTicketMutation() {

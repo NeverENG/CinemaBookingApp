@@ -15,6 +15,17 @@ export interface Cinema {
   distanceKm?: number
 }
 
+export interface AdminAccount {
+  id: number
+  username: string
+  nickname: string
+  role: Role
+  cinemaId?: number
+  cinemaName?: string
+  status: string
+  createdAt: string
+}
+
 export interface Movie {
   id: number
   title: string

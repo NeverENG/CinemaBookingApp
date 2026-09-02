@@ -11,14 +11,27 @@ import (
 )
 
 type adminRow struct {
-	ID           int64  `gorm:"column:id;primaryKey"`
-	Username     string `gorm:"column:username"`
-	PasswordHash string `gorm:"column:password_hash"`
-	Nickname     string `gorm:"column:nickname"`
-	RoleID       int64  `gorm:"column:role_id"`
-	CinemaID     *int64 `gorm:"column:cinema_id"`
-	Status       string `gorm:"column:status"`
+	ID           int64      `gorm:"column:id;primaryKey"`
+	Username     string     `gorm:"column:username"`
+	PasswordHash string     `gorm:"column:password_hash"`
+	Nickname     string     `gorm:"column:nickname"`
+	RoleID       int64      `gorm:"column:role_id"`
+	CinemaID     *int64     `gorm:"column:cinema_id"`
+	Status       string     `gorm:"column:status"`
+	CreatedAt    time.Time  `gorm:"column:created_at"`
 	DeletedAt    *time.Time `gorm:"column:deleted_at"`
+}
+
+type adminListRow struct {
+	ID         int64     `gorm:"column:id"`
+	Username   string    `gorm:"column:username"`
+	Nickname   string    `gorm:"column:nickname"`
+	RoleID     int64     `gorm:"column:role_id"`
+	RoleCode   string    `gorm:"column:role_code"`
+	CinemaID   *int64    `gorm:"column:cinema_id"`
+	CinemaName string    `gorm:"column:cinema_name"`
+	Status     string    `gorm:"column:status"`
+	CreatedAt  time.Time `gorm:"column:created_at"`
 }
 
 func (adminRow) TableName() string { return "admins" }
@@ -56,6 +69,37 @@ func (r *AdminRepo) GetByUsername(ctx context.Context, username string) (*domain
 		return nil, err
 	}
 	return toDomainAdmin(row), nil
+}
+
+func (r *AdminRepo) List(ctx context.Context) ([]domain.Admin, error) {
+	var rows []adminListRow
+	err := r.db.db(ctx).
+		Table("admins AS a").
+		Select(`a.id, a.username, a.nickname, a.role_id, roles.code AS role_code,
+			a.cinema_id, COALESCE(cinemas.name, '') AS cinema_name, a.status, a.created_at`).
+		Joins("JOIN roles ON roles.id = a.role_id").
+		Joins("LEFT JOIN cinemas ON cinemas.id = a.cinema_id").
+		Where("a.deleted_at IS NULL").
+		Order("a.created_at DESC, a.id DESC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	admins := make([]domain.Admin, 0, len(rows))
+	for _, row := range rows {
+		admins = append(admins, domain.Admin{
+			ID:         row.ID,
+			Username:   row.Username,
+			Nickname:   row.Nickname,
+			RoleID:     row.RoleID,
+			RoleCode:   row.RoleCode,
+			CinemaID:   row.CinemaID,
+			CinemaName: row.CinemaName,
+			Status:     row.Status,
+			CreatedAt:  row.CreatedAt,
+		})
+	}
+	return admins, nil
 }
 
 func (r *AdminRepo) Count(ctx context.Context) (int64, error) {
@@ -103,5 +147,6 @@ func toDomainAdmin(row adminRow) *domain.Admin {
 		RoleID:       row.RoleID,
 		CinemaID:     row.CinemaID,
 		Status:       row.Status,
+		CreatedAt:    row.CreatedAt,
 	}
 }

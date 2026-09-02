@@ -17,6 +17,21 @@ func NewAdminUserHandler(users *service.AdminUserSvc) *AdminUserHandler {
 	return &AdminUserHandler{users: users}
 }
 
+// List GET /api/v1/admin/admins
+func (h *AdminUserHandler) List(c *gin.Context) {
+	scope, ok := adminScopeFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "invalid admin")
+		return
+	}
+	admins, err := h.users.List(c.Request.Context(), scope)
+	if err != nil {
+		resp.Error(c, err)
+		return
+	}
+	resp.OK(c, admins)
+}
+
 type createAdminRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required,min=6"`
@@ -51,6 +66,7 @@ func (h *AdminUserHandler) Create(c *gin.Context) {
 	resp.OK(c, gin.H{
 		"id":        admin.ID,
 		"username":  admin.Username,
+		"nickname":  admin.Nickname,
 		"role":      admin.RoleCode,
 		"cinema_id": admin.CinemaID,
 	})

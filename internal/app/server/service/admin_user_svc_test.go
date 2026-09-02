@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
 	"github.com/NeverENG/CinemaBookingApp/internal/pkg/crypto"
@@ -88,5 +89,35 @@ func TestAdminUserCreateFinanceGlobal(t *testing.T) {
 	}
 	if admin.RoleCode != domain.RoleFinance || admin.CinemaID != nil {
 		t.Fatalf("unexpected finance admin: %+v", admin)
+	}
+}
+
+func TestAdminUserListIncludesCinemaName(t *testing.T) {
+	admins, roles, logs := adminUserTestRepos()
+	createdAt := time.Date(2026, time.September, 2, 10, 30, 0, 0, time.FixedZone("CST", 8*60*60))
+	cinemaID := int64(10)
+	admins.admins = map[string]*domain.Admin{
+		"cinema_ops": {
+			ID: 3, Username: "cinema_ops", Nickname: "万象城运营", RoleCode: domain.RoleCinemaAdmin,
+			CinemaID: &cinemaID, CinemaName: "LTerm 万象影城", Status: "ACTIVE", CreatedAt: createdAt,
+		},
+	}
+	svc := NewAdminUserSvc(admins, roles, logs)
+
+	views, err := svc.List(context.Background(), superAdminScope)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(views) != 1 || views[0].Nickname != "万象城运营" || views[0].CinemaName != "LTerm 万象影城" || views[0].CinemaID == nil || *views[0].CinemaID != 10 {
+		t.Fatalf("unexpected views: %+v", views)
+	}
+}
+
+func TestAdminUserListForbidden(t *testing.T) {
+	admins, roles, logs := adminUserTestRepos()
+	svc := NewAdminUserSvc(admins, roles, logs)
+	scope := domain.AdminScope{AdminID: 2, Role: domain.RoleCinemaAdmin, CinemaID: int64Ptr(10)}
+	if _, err := svc.List(context.Background(), scope); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("expected forbidden, got %v", err)
 	}
 }

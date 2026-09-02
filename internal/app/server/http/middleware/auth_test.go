@@ -74,6 +74,14 @@ func (f *middlewareAdminRepo) GetByUsername(ctx context.Context, username string
 	return nil, domain.ErrAdminNotFound
 }
 
+func (f *middlewareAdminRepo) List(ctx context.Context) ([]domain.Admin, error) {
+	admins := make([]domain.Admin, 0, len(f.admins))
+	for _, admin := range f.admins {
+		admins = append(admins, *admin)
+	}
+	return admins, nil
+}
+
 func (f *middlewareAdminRepo) Count(ctx context.Context) (int64, error) {
 	return int64(len(f.admins)), nil
 }

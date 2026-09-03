@@ -3,7 +3,7 @@ import type { AuthSession, Role } from './types'
 const STORAGE_KEY = 'lterm.auth'
 
 export function getStoredAuth(): AuthSession | null {
-  const raw = localStorage.getItem(STORAGE_KEY)
+  const raw = sessionStorage.getItem(STORAGE_KEY)
   if (!raw) {
     return null
   }
@@ -19,11 +19,11 @@ export function getStoredAuth(): AuthSession | null {
 }
 
 export function setStoredAuth(session: AuthSession) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session))
 }
 
 export function clearStoredAuth() {
-  localStorage.removeItem(STORAGE_KEY)
+  sessionStorage.removeItem(STORAGE_KEY)
 }
 
 export function isAdminRole(role: Role | undefined) {

@@ -180,7 +180,7 @@ func newPaymentTestSvc(
 	box *fakeBoxOfficeRepo,
 	members *fakeMembershipRepo,
 ) *PaymentSvc {
-	return NewPaymentSvc(fakeTxManager{}, payments, callbacks, orders, locks, coupons, points, box, members)
+	return NewPaymentSvc(fakeTxManager{}, payments, callbacks, orders, &fakeSessionRepo{sessions: map[int64]*domain.ShowSession{10: {ID: 10, Status: domain.SessionOpen}}}, locks, coupons, points, box, members)
 }
 
 func TestCreatePaymentIdempotent(t *testing.T) {
@@ -323,6 +323,30 @@ func TestHandleMockCallbackAmountMismatch(t *testing.T) {
 	}
 	if orders.orders["O1"].Status != domain.OrderPendingPayment {
 		t.Fatal("order should remain PENDING_PAYMENT")
+	}
+}
+
+func TestHandleMockCallbackRejectsAndClosesExpiredOrder(t *testing.T) {
+	order := paidOrderFixture()
+	order.SessionID = 10
+	order.ExpireAt = time.Now().Add(-time.Minute)
+	orders := &fakeOrderRepo{orders: map[string]*domain.Order{"O1": order}}
+	payments := &fakePaymentRepo{}
+	locks := &fakeSeatLockRepo{}
+	svc := newPaymentTestSvc(orders, payments, &fakeCallbackRepo{}, locks, &fakeCouponRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeMembershipRepo{})
+	tx, err := svc.CreatePayment(context.Background(), CreatePaymentInput{UserID: 1, OrderNo: "O1"})
+	if err == nil {
+		t.Fatal("expired order should not create a payment")
+	}
+	// Create a pending transaction to simulate a callback arriving after the deadline.
+	tx = &domain.PaymentTransaction{TransactionNo: "T-expired", OrderNo: "O1", UserID: 1, AmountCents: order.PaidCents, Status: domain.PaymentPending, Version: 1}
+	payments.txns = map[string]*domain.PaymentTransaction{tx.TransactionNo: tx}
+	err = svc.HandleMockCallback(context.Background(), MockCallbackInput{EventID: "E-expired", TransactionNo: tx.TransactionNo, AmountCents: order.PaidCents})
+	if !errors.Is(err, domain.ErrOrderExpired) {
+		t.Fatalf("expected ErrOrderExpired, got %v", err)
+	}
+	if order.Status != domain.OrderExpired || tx.Status != domain.PaymentClosed {
+		t.Fatalf("expected expired order and closed payment, got %s/%s", order.Status, tx.Status)
 	}
 }
 

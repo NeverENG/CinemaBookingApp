@@ -71,13 +71,14 @@ func rowLabel(row int) string {
 
 // AdminHallSvc 影厅管理：保存布局时 diff 同步 seats。
 type AdminHallSvc struct {
+	tx    port.TxManager
 	halls port.HallRepo
 	seats port.SeatRepo
 	logs  port.OperationLogRepo
 }
 
-func NewAdminHallSvc(halls port.HallRepo, seats port.SeatRepo, logs port.OperationLogRepo) *AdminHallSvc {
-	return &AdminHallSvc{halls: halls, seats: seats, logs: logs}
+func NewAdminHallSvc(tx port.TxManager, halls port.HallRepo, seats port.SeatRepo, logs port.OperationLogRepo) *AdminHallSvc {
+	return &AdminHallSvc{tx: tx, halls: halls, seats: seats, logs: logs}
 }
 
 type HallInput struct {
@@ -87,6 +88,16 @@ type HallInput struct {
 }
 
 func (s *AdminHallSvc) Create(ctx context.Context, scope domain.AdminScope, in HallInput) (*domain.Hall, error) {
+	var hall *domain.Hall
+	err := s.tx.Run(ctx, func(txCtx context.Context) error {
+		var err error
+		hall, err = s.create(txCtx, scope, in)
+		return err
+	})
+	return hall, err
+}
+
+func (s *AdminHallSvc) create(ctx context.Context, scope domain.AdminScope, in HallInput) (*domain.Hall, error) {
 	if !scope.CanManageCinema(in.CinemaID) {
 		return nil, domain.ErrForbidden
 	}
@@ -113,6 +124,16 @@ func (s *AdminHallSvc) Create(ctx context.Context, scope domain.AdminScope, in H
 }
 
 func (s *AdminHallSvc) Update(ctx context.Context, scope domain.AdminScope, hallID int64, in HallInput) (*domain.Hall, error) {
+	var hall *domain.Hall
+	err := s.tx.Run(ctx, func(txCtx context.Context) error {
+		var err error
+		hall, err = s.update(txCtx, scope, hallID, in)
+		return err
+	})
+	return hall, err
+}
+
+func (s *AdminHallSvc) update(ctx context.Context, scope domain.AdminScope, hallID int64, in HallInput) (*domain.Hall, error) {
 	layout, err := parseSeatLayout(in.SeatLayout)
 	if err != nil {
 		return nil, err

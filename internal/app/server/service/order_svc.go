@@ -65,7 +65,7 @@ func (s *OrderSvc) CreateOrder(ctx context.Context, in CreateOrderInput) (*domai
 			return err
 		}
 
-		session, err := s.sessions.GetSessionByID(txCtx, in.SessionID)
+		session, err := s.sessions.GetSessionForUpdate(txCtx, in.SessionID)
 		if err != nil {
 			return err
 		}
@@ -83,6 +83,9 @@ func (s *OrderSvc) CreateOrder(ctx context.Context, in CreateOrderInput) (*domai
 		}
 		if len(seats) != len(in.SeatIDs) {
 			return domain.ErrSeatNotAvailable
+		}
+		if err := s.locks.ReleaseExpiredBySeats(txCtx, session.ID, in.SeatIDs); err != nil {
+			return err
 		}
 		prices := make([]int64, 0, len(seats))
 		for _, seat := range seats {

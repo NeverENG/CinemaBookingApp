@@ -50,12 +50,17 @@ type mockRefundCallbackRequest struct {
 
 // MockCallback POST /api/v1/refunds/mock-callback
 func (h *RefundHandler) MockCallback(c *gin.Context) {
+	userID, ok := userIDFrom(c)
+	if !ok {
+		resp.Fail(c, http.StatusUnauthorized, "invalid user")
+		return
+	}
 	var req mockRefundCallbackRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		resp.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := h.refunds.HandleMockCallback(c.Request.Context(), req.RefundNo); err != nil {
+	if err := h.refunds.HandleMockCallbackForUser(c.Request.Context(), userID, req.RefundNo); err != nil {
 		resp.Error(c, err)
 		return
 	}

@@ -12,6 +12,7 @@ import (
 type OrderRepo interface {
 	CreateOrder(ctx context.Context, order *domain.Order) error
 	GetOrderByNo(ctx context.Context, orderNo string) (*domain.Order, error)
+	GetOrderForUpdate(ctx context.Context, orderNo string) (*domain.Order, error)
 	Transition(ctx context.Context, orderNo string, from, to domain.OrderStatus, version int32) error
 	ListExpiredPending(ctx context.Context, now time.Time) ([]domain.Order, error)
 	ExpirePendingBySessionID(ctx context.Context, sessionID int64) ([]string, error)

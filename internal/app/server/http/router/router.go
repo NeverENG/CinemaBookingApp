@@ -31,6 +31,7 @@ func New(
 	adminCinemaHandler *handler.AdminCinemaHandler,
 	catalogHandler *handler.CatalogHandler,
 	ticketHandler *handler.TicketHandler,
+	callbackSecret string,
 ) *gin.Engine {
 	r := gin.Default()
 	_ = r.SetTrustedProxies(nil) // 不信任代理头，去除 gin 默认警告
@@ -64,9 +65,9 @@ func New(
 		v1.GET("/me/points", authMw.User(), pointsHandler.Get)
 		v1.POST("/me/points/exchange", authMw.User(), pointsHandler.Exchange)
 		v1.GET("/coupons/redeemable", pointsHandler.ListRedeemable)
-		v1.POST("/refunds/mock-callback", refundHandler.MockCallback)
-		// 模拟网关回调：不挂用户鉴权（真实场景由网关签名校验）
-		v1.POST("/payments/mock-callback", paymentHandler.MockCallback)
+		v1.POST("/refunds/mock-callback", authMw.User(), refundHandler.MockCallback)
+		// 模拟网关回调使用独立共享密钥，不接受用户 token 代替网关身份。
+		v1.POST("/payments/mock-callback", middleware.CallbackSecret(callbackSecret), paymentHandler.MockCallback)
 
 		admin := v1.Group("/admin")
 		{

@@ -2,7 +2,7 @@ import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from 're
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AdminLayout } from '../../layouts/AdminLayout'
 import { UserLayout } from '../../layouts/UserLayout'
-import { RequireAuth, RequireRole } from './guards'
+import { RequireAuth, RequireRole, RequireUserArea } from './guards'
 
 const LoginPage = lazy(() => import('../../pages/auth/LoginPage').then(({ LoginPage: page }) => ({ default: page })))
 const ForgotPasswordPage = lazy(() => import('../../pages/auth/ForgotPasswordPage').then(({ ForgotPasswordPage: page }) => ({ default: page })))
@@ -43,7 +43,7 @@ export const router = createBrowserRouter([
   { path: '/forbidden', element: lazyElement(ForbiddenPage) },
   {
     path: '/',
-    element: <UserLayout />,
+    element: <RequireUserArea><UserLayout /></RequireUserArea>,
     children: [
       { index: true, element: lazyElement(HomePage) },
       { path: 'recommend', element: lazyElement(HomePage) },

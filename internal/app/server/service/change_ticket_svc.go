@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
@@ -10,6 +11,7 @@ import (
 
 // ChangeTicketSvc 改签：同影片跨场次 = 退旧单 + 订新单（多退少补）。
 type ChangeTicketSvc struct {
+	tx         port.TxManager
 	orders     port.OrderRepo
 	sessions   port.SessionRepo
 	orderSvc   *OrderSvc
@@ -18,13 +20,14 @@ type ChangeTicketSvc struct {
 }
 
 func NewChangeTicketSvc(
+	tx port.TxManager,
 	orders port.OrderRepo,
 	sessions port.SessionRepo,
 	orderSvc *OrderSvc,
 	paymentSvc *PaymentSvc,
 	refundSvc *RefundSvc,
 ) *ChangeTicketSvc {
-	return &ChangeTicketSvc{orders: orders, sessions: sessions, orderSvc: orderSvc, paymentSvc: paymentSvc, refundSvc: refundSvc}
+	return &ChangeTicketSvc{tx: tx, orders: orders, sessions: sessions, orderSvc: orderSvc, paymentSvc: paymentSvc, refundSvc: refundSvc}
 }
 
 type ChangeTicketResult struct {
@@ -41,22 +44,39 @@ func (s *ChangeTicketSvc) Change(
 	newSessionID int64,
 	newSeatIDs []int64,
 ) (*ChangeTicketResult, error) {
-	order, err := s.orders.GetOrderByNo(ctx, orderNo)
+	var result *ChangeTicketResult
+	err := s.tx.Run(ctx, func(txCtx context.Context) error {
+		var err error
+		result, err = s.changeInTx(txCtx, userID, orderNo, newSessionID, newSeatIDs)
+		return err
+	})
+	return result, err
+}
+
+func (s *ChangeTicketSvc) changeInTx(ctx context.Context, userID int64, orderNo string, newSessionID int64, newSeatIDs []int64) (*ChangeTicketResult, error) {
+	orderSnapshot, err := s.orders.GetOrderByNo(ctx, orderNo)
 	if err != nil {
 		return nil, err
 	}
-	if order.UserID != userID {
+	if orderSnapshot.UserID != userID {
 		return nil, domain.ErrForbidden
+	}
+	oldSession, err := s.sessions.GetSessionForUpdate(ctx, orderSnapshot.SessionID)
+	if err != nil {
+		return nil, err
+	}
+	order, err := s.orders.GetOrderForUpdate(ctx, orderNo)
+	if err != nil {
+		return nil, err
+	}
+	if order.Status == domain.OrderRefunded {
+		return s.existingChangeResult(ctx, order)
 	}
 	if order.Status != domain.OrderPaid || hasUsedTicket(order) {
 		return nil, domain.ErrOrderNotRefundable
 	}
 	if len(order.Items) > 0 && len(newSeatIDs) != len(order.Items) {
 		return nil, domain.ErrChangeSeatCount
-	}
-	oldSession, err := s.sessions.GetSessionByID(ctx, order.SessionID)
-	if err != nil {
-		return nil, err
 	}
 	if !oldSession.StartTime.After(time.Now()) {
 		return nil, domain.ErrOrderNotRefundable
@@ -94,7 +114,7 @@ func (s *ChangeTicketSvc) Change(
 	}
 
 	// 3. 退原单；失败则退回新单，恢复原状
-	refund, err := s.refundSvc.ApplyRefund(ctx, userID, ApplyRefundInput{OrderNo: orderNo, Reason: "change_ticket"})
+	refund, err := s.refundSvc.ApplyRefund(ctx, userID, ApplyRefundInput{OrderNo: orderNo, Reason: "change_ticket:" + newOrder.OrderNo})
 	if err != nil {
 		s.rollbackNewOrder(ctx, userID, newOrder.OrderNo)
 		return nil, err
@@ -110,6 +130,22 @@ func (s *ChangeTicketSvc) Change(
 		RefundNo:          refund.RefundNo,
 		RefundAmountCents: refund.AmountCents,
 	}, nil
+}
+
+func (s *ChangeTicketSvc) existingChangeResult(ctx context.Context, order *domain.Order) (*ChangeTicketResult, error) {
+	refund, err := s.refundSvc.refunds.GetByOrderNo(ctx, order.OrderNo)
+	if err != nil {
+		return nil, domain.ErrOrderNotRefundable
+	}
+	newOrderNo, ok := strings.CutPrefix(refund.Reason, "change_ticket:")
+	if !ok || newOrderNo == "" || refund.Status != domain.RefundSuccess {
+		return nil, domain.ErrOrderNotRefundable
+	}
+	newOrder, err := s.orders.GetOrderByNo(ctx, newOrderNo)
+	if err != nil {
+		return nil, err
+	}
+	return &ChangeTicketResult{NewOrderNo: newOrder.OrderNo, NewPaidCents: newOrder.PaidCents, RefundNo: refund.RefundNo, RefundAmountCents: refund.AmountCents}, nil
 }
 
 // rollbackNewOrder 新单已支付但原单退款失败时，把新单也退掉。

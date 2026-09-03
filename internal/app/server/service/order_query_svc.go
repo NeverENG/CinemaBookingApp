@@ -44,6 +44,8 @@ type OrderView struct {
 	ExpireAt      time.Time          `json:"expire_at"`
 	CreatedAt     time.Time          `json:"created_at"`
 	PaidAt        *time.Time         `json:"paid_at"`
+	CanRefund     bool               `json:"can_refund"`
+	CanChange     bool               `json:"can_change"`
 	Items         []OrderItemView    `json:"items"`
 }
 
@@ -101,7 +103,11 @@ func (s *OrderQuerySvc) toView(ctx context.Context, order *domain.Order) (*Order
 		return nil, err
 	}
 	items := make([]OrderItemView, 0, len(order.Items))
+	hasUsed := false
 	for _, item := range order.Items {
+		if item.UsedAt != nil {
+			hasUsed = true
+		}
 		items = append(items, OrderItemView{
 			ID:         item.ID,
 			SeatID:     item.SeatID,
@@ -111,6 +117,7 @@ func (s *OrderQuerySvc) toView(ctx context.Context, order *domain.Order) (*Order
 			UsedAt:     item.UsedAt,
 		})
 	}
+	canRefund := order.Status == domain.OrderPaid && !hasUsed && session.StartTime.After(time.Now())
 	return &OrderView{
 		OrderNo:       order.OrderNo,
 		UserID:        order.UserID,
@@ -129,6 +136,8 @@ func (s *OrderQuerySvc) toView(ctx context.Context, order *domain.Order) (*Order
 		ExpireAt:      order.ExpireAt,
 		CreatedAt:     order.CreatedAt,
 		PaidAt:        order.PaidAt,
+		CanRefund:     canRefund,
+		CanChange:     canRefund,
 		Items:         items,
 	}, nil
 }

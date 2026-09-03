@@ -117,6 +117,8 @@ export interface Order {
   expireAt?: string
   createdAt?: string
   paidAt?: string | null
+  canRefund?: boolean
+  canChange?: boolean
   items: OrderItem[]
 }
 

@@ -33,12 +33,18 @@ func NewOperationLogRepo(db *DB) *OperationLogRepo {
 }
 
 func (r *OperationLogRepo) Create(ctx context.Context, log *domain.OperationLog) error {
+	detail := log.Detail
+	// detail_json is NOT NULL; represent operations without extra details as
+	// an empty JSON object so the audit write cannot abort the surrounding tx.
+	if detail == nil {
+		detail = map[string]any{}
+	}
 	row := operationLogRow{
 		AdminID:    log.AdminID,
 		Action:     log.Action,
 		TargetType: log.TargetType,
 		TargetID:   log.TargetID,
-		Detail:     log.Detail,
+		Detail:     detail,
 		IP:         log.IP,
 		CreatedAt:  time.Now(),
 	}

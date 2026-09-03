@@ -21,6 +21,9 @@ func NewTxManager(db *DB) *TxManager {
 
 // Run 一个用例一个事务：fn 内的所有 repo 调用共享同一个 tx。
 func (m *TxManager) Run(ctx context.Context, fn func(ctx context.Context) error) error {
+	if _, ok := ctx.Value(ctxKey{}).(*gorm.DB); ok {
+		return fn(ctx)
+	}
 	return m.db.gorm.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		return fn(withTx(ctx, tx))
 	})

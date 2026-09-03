@@ -156,6 +156,8 @@ export function normalizeOrder(raw: Raw): Order {
     expireAt: string(raw, 'expireAt', 'expire_at', 'ExpireAt') || undefined,
     createdAt: string(raw, 'createdAt', 'created_at', 'CreatedAt') || undefined,
     paidAt: read<string | null>(raw, 'paidAt', 'paid_at', 'PaidAt'),
+    canRefund: boolean(raw, 'canRefund', 'can_refund', 'CanRefund'),
+    canChange: boolean(raw, 'canChange', 'can_change', 'CanChange'),
     items: items.map(normalizeOrderItem),
   }
 }

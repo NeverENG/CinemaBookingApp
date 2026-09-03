@@ -9,6 +9,7 @@ import (
 
 type SessionRepo interface {
 	GetSessionByID(ctx context.Context, id int64) (*domain.ShowSession, error)
+	GetSessionForUpdate(ctx context.Context, id int64) (*domain.ShowSession, error)
 	Create(ctx context.Context, session *domain.ShowSession) error
 	UpdatePrice(ctx context.Context, id int64, basePriceCents int64, priceRulesJSON string) error
 	Cancel(ctx context.Context, id int64) error

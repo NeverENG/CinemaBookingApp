@@ -2,19 +2,21 @@ package service
 
 import (
 	"context"
-	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
-	"github.com/NeverENG/CinemaBookingApp/internal/core/port"
 	"strconv"
 	"strings"
+
+	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
+	"github.com/NeverENG/CinemaBookingApp/internal/core/port"
 )
 
 type AdminCinemaSvc struct {
+	tx      port.TxManager
 	cinemas port.CinemaRepo
 	logs    port.OperationLogRepo
 }
 
-func NewAdminCinemaSvc(cinemas port.CinemaRepo, logs port.OperationLogRepo) *AdminCinemaSvc {
-	return &AdminCinemaSvc{cinemas: cinemas, logs: logs}
+func NewAdminCinemaSvc(tx port.TxManager, cinemas port.CinemaRepo, logs port.OperationLogRepo) *AdminCinemaSvc {
+	return &AdminCinemaSvc{tx: tx, cinemas: cinemas, logs: logs}
 }
 
 type CinemaInput struct {
@@ -29,6 +31,15 @@ func (s *AdminCinemaSvc) List(ctx context.Context, scope domain.AdminScope) ([]d
 	return s.cinemas.ListAll(ctx)
 }
 func (s *AdminCinemaSvc) Create(ctx context.Context, scope domain.AdminScope, in CinemaInput) (*domain.Cinema, error) {
+	var cinema *domain.Cinema
+	err := s.tx.Run(ctx, func(txCtx context.Context) error {
+		var err error
+		cinema, err = s.create(txCtx, scope, in)
+		return err
+	})
+	return cinema, err
+}
+func (s *AdminCinemaSvc) create(ctx context.Context, scope domain.AdminScope, in CinemaInput) (*domain.Cinema, error) {
 	if scope.Role != domain.RoleSuperAdmin {
 		return nil, domain.ErrForbidden
 	}
@@ -42,6 +53,15 @@ func (s *AdminCinemaSvc) Create(ctx context.Context, scope domain.AdminScope, in
 	return c, s.log(ctx, scope.AdminID, "CREATE_CINEMA", "cinema", strconv.FormatInt(c.ID, 10), c)
 }
 func (s *AdminCinemaSvc) Update(ctx context.Context, scope domain.AdminScope, id int64, in CinemaInput) (*domain.Cinema, error) {
+	var cinema *domain.Cinema
+	err := s.tx.Run(ctx, func(txCtx context.Context) error {
+		var err error
+		cinema, err = s.update(txCtx, scope, id, in)
+		return err
+	})
+	return cinema, err
+}
+func (s *AdminCinemaSvc) update(ctx context.Context, scope domain.AdminScope, id int64, in CinemaInput) (*domain.Cinema, error) {
 	if scope.Role != domain.RoleSuperAdmin {
 		return nil, domain.ErrForbidden
 	}
@@ -63,6 +83,11 @@ func (s *AdminCinemaSvc) Update(ctx context.Context, scope domain.AdminScope, id
 	return c, s.log(ctx, scope.AdminID, "UPDATE_CINEMA", "cinema", strconv.FormatInt(id, 10), c)
 }
 func (s *AdminCinemaSvc) SetStatus(ctx context.Context, scope domain.AdminScope, id int64, status domain.CinemaStatus) error {
+	return s.tx.Run(ctx, func(txCtx context.Context) error {
+		return s.setStatus(txCtx, scope, id, status)
+	})
+}
+func (s *AdminCinemaSvc) setStatus(ctx context.Context, scope domain.AdminScope, id int64, status domain.CinemaStatus) error {
 	if scope.Role != domain.RoleSuperAdmin {
 		return domain.ErrForbidden
 	}

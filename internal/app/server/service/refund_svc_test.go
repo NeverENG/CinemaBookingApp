@@ -147,3 +147,16 @@ func TestHandleRefundCallbackDuplicate(t *testing.T) {
 		t.Fatalf("duplicate callback should be idempotent, got %v", err)
 	}
 }
+
+func TestHandleRefundCallbackForUserChecksOwnership(t *testing.T) {
+	orders, sessions := refundFixture()
+	orders.orders["O1"].Status = domain.OrderRefunding
+	refunds := &fakeRefundRepo{}
+	if err := refunds.Create(context.Background(), &domain.Refund{RefundNo: "RF-owner", OrderNo: "O1", UserID: 1, AmountCents: 5000, Status: domain.RefundPending}); err != nil {
+		t.Fatal(err)
+	}
+	svc := newRefundTestSvc(orders, sessions, refunds, &fakePaymentRepo{}, &fakeSeatLockRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{})
+	if err := svc.HandleMockCallbackForUser(context.Background(), 2, "RF-owner"); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+}

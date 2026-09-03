@@ -18,6 +18,7 @@ type PaymentSvc struct {
 	payments  port.PaymentRepo
 	callbacks port.PaymentCallbackRepo
 	orders    port.OrderRepo
+	sessions  port.SessionRepo
 	locks     port.SeatLockRepo
 	coupons   port.UserCouponRepo
 	points    port.PointsRepo
@@ -30,6 +31,7 @@ func NewPaymentSvc(
 	payments port.PaymentRepo,
 	callbacks port.PaymentCallbackRepo,
 	orders port.OrderRepo,
+	sessions port.SessionRepo,
 	locks port.SeatLockRepo,
 	coupons port.UserCouponRepo,
 	points port.PointsRepo,
@@ -41,6 +43,7 @@ func NewPaymentSvc(
 		payments:  payments,
 		callbacks: callbacks,
 		orders:    orders,
+		sessions:  sessions,
 		locks:     locks,
 		coupons:   coupons,
 		points:    points,
@@ -118,7 +121,8 @@ type MockCallbackInput struct {
 // 事务内：回调落库 → 交易 SUCCESS → 订单 PAID → 锁座 BOOKED →
 // 生成取票码 → 优惠券 USED → 回调 PROCESSED。
 func (s *PaymentSvc) HandleMockCallback(ctx context.Context, in MockCallbackInput) error {
-	return s.tx.Run(ctx, func(txCtx context.Context) error {
+	expired := false
+	err := s.tx.Run(ctx, func(txCtx context.Context) error {
 		cb := &domain.PaymentCallback{
 			EventID:       in.EventID,
 			TransactionNo: in.TransactionNo,
@@ -134,6 +138,9 @@ func (s *PaymentSvc) HandleMockCallback(ctx context.Context, in MockCallbackInpu
 			existing, err := s.callbacks.GetByEventID(txCtx, cb.EventID)
 			if err != nil {
 				return err
+			}
+			if existing.TransactionNo != cb.TransactionNo || existing.AmountCents != cb.AmountCents {
+				return domain.ErrInvalidInput
 			}
 			if existing.Status == domain.CallbackProcessed {
 				return nil // 已处理：按幂等成功返回
@@ -151,6 +158,48 @@ func (s *PaymentSvc) HandleMockCallback(ctx context.Context, in MockCallbackInpu
 		if payment.AmountCents != in.AmountCents {
 			return domain.ErrPaymentAmountMismatch
 		}
+		orderSnapshot, err := s.orders.GetOrderByNo(txCtx, payment.OrderNo)
+		if err != nil {
+			return err
+		}
+		if _, err := s.sessions.GetSessionForUpdate(txCtx, orderSnapshot.SessionID); err != nil {
+			return err
+		}
+		order, err := s.orders.GetOrderForUpdate(txCtx, payment.OrderNo)
+		if err != nil {
+			return err
+		}
+		if order.Status != domain.OrderPendingPayment {
+			return domain.ErrInvalidTransition
+		}
+		if order.IsExpired(time.Now()) {
+			if err := order.Transition(domain.OrderEventTimeout); err != nil {
+				return err
+			}
+			if err := s.orders.Transition(txCtx, order.OrderNo, domain.OrderPendingPayment, domain.OrderExpired, order.Version); err != nil {
+				return err
+			}
+			if err := s.locks.ReleaseByOrderNo(txCtx, order.OrderNo, domain.SeatLockExpired); err != nil {
+				return err
+			}
+			if err := s.sessions.RecalcStatus(txCtx, order.SessionID); err != nil {
+				return err
+			}
+			if err := s.coupons.UnlockByOrderNo(txCtx, order.OrderNo); err != nil {
+				return err
+			}
+			if err := payment.Transition(domain.PaymentEventClose); err != nil {
+				return err
+			}
+			if err := s.payments.Transition(txCtx, payment.TransactionNo, domain.PaymentPending, domain.PaymentClosed, payment.Version); err != nil {
+				return err
+			}
+			expired = true
+			return s.callbacks.MarkProcessed(txCtx, cb.EventID)
+		}
+		if order.PaidCents != in.AmountCents {
+			return domain.ErrPaymentAmountMismatch
+		}
 		if err := payment.Transition(domain.PaymentEventSuccess); err != nil {
 			return err
 		}
@@ -159,17 +208,6 @@ func (s *PaymentSvc) HandleMockCallback(ctx context.Context, in MockCallbackInpu
 		}
 		paidAt := time.Now()
 		payment.PaidAt = &paidAt
-
-		order, err := s.orders.GetOrderByNo(txCtx, payment.OrderNo)
-		if err != nil {
-			return err
-		}
-		if order.Status != domain.OrderPendingPayment {
-			return domain.ErrInvalidTransition
-		}
-		if order.PaidCents != in.AmountCents {
-			return domain.ErrPaymentAmountMismatch
-		}
 		if err := order.Transition(domain.OrderEventPaySuccess); err != nil {
 			return err
 		}
@@ -198,6 +236,13 @@ func (s *PaymentSvc) HandleMockCallback(ctx context.Context, in MockCallbackInpu
 
 		return s.callbacks.MarkProcessed(txCtx, cb.EventID)
 	})
+	if err != nil {
+		return err
+	}
+	if expired {
+		return domain.ErrOrderExpired
+	}
+	return nil
 }
 
 const maxCallbackRetryAttempts = 5

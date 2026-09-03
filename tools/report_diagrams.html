@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+*{box-sizing:border-box} body{margin:0;background:#d9d9d9;font-family:"STSong","Songti SC","SimSun",serif;color:#000}
+.diagram{width:1400px;height:860px;background:#fff;padding:46px 62px;position:relative;overflow:hidden}
+.diagram+.diagram{margin-top:30px}.kicker{display:none}.title{font-size:31px;font-weight:700;text-align:center;margin:0 0 10px}.sub{font-size:16px;color:#333;text-align:center;margin-bottom:20px}.rule{height:1px;background:#000;width:100%;margin-bottom:22px}
+.role-grid{display:grid;grid-template-columns:1fr 150px 1fr;grid-template-rows:1fr 1fr;gap:18px 14px;height:650px;align-items:stretch}.role{border:1.5px solid #000;border-radius:0;padding:20px 24px;background:#fff}.role h3{margin:0 0 12px;font-size:23px;border-bottom:1px solid #999;padding-bottom:8px}.role ul{margin:0;padding-left:22px;font-size:17px;line-height:1.75}.role .tag{display:inline-block;font-size:14px;color:#000;background:#eee;border:1px solid #777;padding:3px 9px;border-radius:0;margin-bottom:10px}.center{grid-column:2;grid-row:1/3;display:flex;align-items:center;justify-content:center}.hub{width:140px;height:76px;border:2px solid #000;border-radius:0;background:#eee;color:#000;display:flex;align-items:center;justify-content:center;text-align:center;font-size:19px;font-weight:700;line-height:1.35}.arrow{display:flex;align-items:center;justify-content:center;font-size:38px;color:#000;font-weight:400}
+.arch{display:flex;flex-direction:column;gap:9px;height:650px}.layer{border:1.5px solid #000;border-radius:0;padding:12px 20px;display:grid;grid-template-columns:190px 1fr;align-items:center;min-height:72px}.layer strong{font-size:20px}.nodes{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.node{background:#f2f2f2;border:1px solid #777;border-radius:0;padding:8px 14px;font-size:16px}.node.accent{background:#e7e7e7;border-color:#555}.down{text-align:center;height:18px;font-size:25px;line-height:16px;color:#000}.arch-foot{display:grid;grid-template-columns:1fr 1fr;gap:16px}.side{border:1px dashed #555;padding:11px 16px;border-radius:0;font-size:16px}.side b{color:#000}
+.domains{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}.domain{border:1.5px solid #000;border-radius:0;padding:15px 18px;min-height:126px}.domain h3{font-size:19px;margin:0 0 8px;color:#000;background:#ededed;border-bottom:1px solid #777;padding:5px 7px}.domain p{font-family:Menlo,Consolas,monospace;font-size:14px;line-height:1.55;margin:0 7px}.flow-title{font-size:19px;font-weight:700;margin:4px 0 11px}.flow{display:grid;grid-template-columns:1.05fr 42px .85fr 42px .95fr 42px 1.05fr 42px 1.05fr;align-items:stretch}.step{border:1.5px solid #000;border-radius:0;padding:12px 10px;text-align:center;background:#fff;min-height:125px;display:flex;flex-direction:column;justify-content:center}.step b{font-size:17px;margin-bottom:7px}.step span{font-size:13px;line-height:1.5;color:#333}.arr{display:flex;align-items:center;justify-content:center;font-size:28px;color:#000}.keys{display:flex;gap:12px;margin-top:14px}.key{flex:1;background:#f3f3f3;border:1px solid #777;padding:9px 12px;font-size:14px;line-height:1.4}.footer{position:absolute;bottom:16px;right:62px;font-size:13px;color:#555}
+</style>
+</head>
+<body>
+<section class="diagram" id="roles">
+ <div class="kicker">ROLE & PERMISSION</div><div class="title">角色功能与权限边界</div><div class="sub">各角色通过统一认证进入系统，仅访问其授权范围内的业务功能</div><div class="rule"></div>
+ <div class="role-grid">
+  <div class="role"><span class="tag">平台级</span><h3>平台管理员</h3><ul><li>录入并维护片方提供的影片资料</li><li>影院准入、影院信息与状态管理</li><li>影片审核、上下架与运营内容管理</li><li>管理员账号、角色及影院范围配置</li></ul></div>
+  <div class="center"><div class="hub">电影院<br>订票系统</div></div>
+  <div class="role"><span class="tag">影院级</span><h3>影院管理员</h3><ul><li>维护授权影院的影厅和座位布局</li><li>创建排片、调整票价、取消场次</li><li>查询票券并完成入场核销</li><li>查看本影院经营数据</li></ul></div>
+  <div class="role"><span class="tag">只读经营</span><h3>财务人员</h3><ul><li>查看订单数、出票数和票房指标</li><li>查看总票房、退款额和净票房</li><li>按日期、影片和影院分析数据</li><li>不修改订单、退款和排片状态</li></ul></div>
+  <div class="role"><span class="tag">用户端</span><h3>普通用户</h3><ul><li>浏览影片、影院及可售场次</li><li>实时选座、锁座、下单和支付</li><li>查询订单、电子票、退款与改签</li><li>使用优惠券并积累会员积分</li></ul></div>
+ </div><div class="footer">图示：角色目标、操作范围与权限约束</div>
+</section>
+
+<section class="diagram" id="architecture">
+ <div class="kicker">SYSTEM ARCHITECTURE</div><div class="title">系统分层架构与请求链路</div><div class="sub">前后端分离，核心业务通过端口接口与基础设施解耦</div><div class="rule"></div>
+ <div class="arch">
+  <div class="layer"><strong>用户与管理端</strong><div class="nodes"><span class="node accent">用户购票端</span><span class="node accent">影院运营端</span><span class="node accent">平台管理端</span><span class="node">React + TypeScript</span></div></div><div class="down">↓</div>
+  <div class="layer"><strong>接口接入层</strong><div class="nodes"><span class="node">Nginx</span><span class="node">Gin Router</span><span class="node">JWT / RBAC</span><span class="node">Handler 参数校验</span><span class="node">统一响应与 Request-ID</span></div></div><div class="down">↓</div>
+  <div class="layer"><strong>应用服务层</strong><div class="nodes"><span class="node accent">影片与排片 Service</span><span class="node accent">锁座与订单 Service</span><span class="node accent">支付退款 Service</span><span class="node accent">会员与票房 Service</span><span class="node">TxManager 事务边界</span></div></div><div class="down">↓</div>
+  <div class="layer"><strong>领域与端口层</strong><div class="nodes"><span class="node">Order / Payment 状态机</span><span class="node">SeatLock 并发规则</span><span class="node">Repository Port</span><span class="node">领域错误与业务约束</span></div></div><div class="down">↓</div>
+  <div class="layer"><strong>基础设施层</strong><div class="nodes"><span class="node">PostgreSQL Repository</span><span class="node">PostgreSQL 15+</span><span class="node">Mock 支付网关</span><span class="node">Docker Compose</span></div></div>
+  <div class="arch-foot"><div class="side"><b>异步任务：</b>订单超时、锁座释放、回调重试、优惠券过期</div><div class="side"><b>数据保障：</b>数据库事务、唯一索引、乐观锁、条件 UPDATE</div></div>
+ </div><div class="footer">请求方向：Page → Handler → Service → Port → Repository</div>
+</section>
+
+<section class="diagram" id="database">
+ <div class="kicker">DATABASE FLOW</div><div class="title">数据库表归类与核心数据流转</div><div class="sub">按业务域组织表结构，以订单号、支付事件和座位唯一约束串联交易闭环</div><div class="rule"></div>
+ <div class="domains">
+  <div class="domain"><h3>账户与会员域</h3><p>users<br>membership_levels<br>membership_level_logs<br>points_ledger</p></div>
+  <div class="domain"><h3>影片与影院资源域</h3><p>movies · cinemas<br>halls · seats</p></div>
+  <div class="domain"><h3>交易订单域</h3><p>seat_locks<br>orders<br>order_items</p></div>
+  <div class="domain"><h3>支付售后域</h3><p>payment_transactions<br>payment_callbacks<br>refunds</p></div>
+  <div class="domain"><h3>排片域</h3><p>show_sessions<br>关联影片、影院与影厅</p></div>
+  <div class="domain"><h3>营销、统计与审计域</h3><p>coupon_templates · user_coupons<br>box_office_ledger · daily_box_office<br>operation_logs</p></div>
+ </div>
+ <div class="flow-title">核心购票与售后数据链路</div>
+ <div class="flow">
+  <div class="step"><b>维护主数据</b><span>movies / cinemas<br>halls / seats</span></div><div class="arr">→</div>
+  <div class="step"><b>创建排片</b><span>show_sessions<br>关联影片、影院和影厅</span></div><div class="arr">→</div>
+  <div class="step"><b>锁座下单</b><span>seat_locks<br>orders / order_items</span></div><div class="arr">→</div>
+  <div class="step"><b>支付出票</b><span>transactions / callbacks<br>LOCKED → BOOKED</span></div><div class="arr">→</div>
+  <div class="step"><b>积分与票房</b><span>points_ledger<br>box_office_ledger → daily_box_office</span></div>
+ </div>
+ <div class="keys"><div class="key"><b>防超卖</b><br>(session_id, seat_id) 对 LOCKED / BOOKED 建部分唯一索引</div><div class="key"><b>回调幂等</b><br>payment_callbacks.event_id 唯一，重复回调不重复出票</div><div class="key"><b>售后回写</b><br>退款联动订单、支付、座位、积分和票房，失败整体回滚</div></div>
+ <div class="footer">关联主线：user_id / session_id / order_no / transaction_no / event_id / refund_no</div>
+</section>
+
+<section class="diagram" id="seatstate">
+ <div class="title">座位锁状态迁移</div><div class="sub">座位状态由服务层控制，资源变更与订单状态写入同一数据库事务</div><div class="rule"></div>
+ <div style="height:570px;border:1px solid #999;padding:38px 60px">
+  <div style="display:grid;grid-template-columns:260px 100px 300px 100px 300px;justify-content:center;align-items:center;margin:22px 0 38px">
+   <div class="step"><b>可售座位</b><span>不存在有效锁记录</span></div><div class="arr">→</div>
+   <div class="step"><b>LOCKED</b><span>创建待支付订单<br>默认保留 15 分钟</span></div><div class="arr">→</div>
+   <div class="step"><b>BOOKED</b><span>支付成功<br>座位转为已售</span></div>
+  </div>
+  <div style="border-top:1px solid #999;padding-top:22px;display:grid;grid-template-columns:220px 1fr 260px;row-gap:15px;align-items:center;font-size:17px">
+   <b>LOCKED</b><span style="text-align:center">用户取消或订单超时　────────→</span><div class="node">RELEASED</div>
+   <b>LOCKED</b><span style="text-align:center">孤立锁超过 expires_at　──────→</span><div class="node">EXPIRED</div>
+   <b>BOOKED</b><span style="text-align:center">退款成功　──────────────→</span><div class="node">RELEASED</div>
+  </div>
+  <div style="margin-top:24px;text-align:center;font-size:15px;border-top:1px dashed #777;padding-top:13px">并发保障：同一场次与座位在 LOCKED / BOOKED 状态下只能存在一条有效记录；更新语句通过旧状态条件限制合法迁移。</div>
+ </div>
+ <div class="footer">状态主线：LOCKED → BOOKED / RELEASED / EXPIRED；BOOKED → RELEASED</div>
+</section>
+</body></html>

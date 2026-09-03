@@ -18,6 +18,7 @@
 | 架构 | [guide/项目架构-贫血DDD.md](guide/项目架构-贫血DDD.md) | Go 项目目录结构、分层职责、事务所有权 | v0.1 |
 | 参考 | [guide/如何参考开源项目.md](guide/如何参考开源项目.md) | 主流架构对比、推荐项目、五步阅读法、练习任务 | v0.1 |
 | 蓝图 | [guide/LTerm后端结构蓝图.md](guide/LTerm后端结构蓝图.md) | 对齐 potentia/backend：core/domain + core/port + infra + app/server | v0.2 |
+| 架构图 | [architecture/架构图.md](architecture/架构图.md) | 服务运行、代码依赖、数据关系和 SaaS 服务提供架构 | v0.1 |
 | 设计 | [design/00-设计总览.md](design/00-设计总览.md) | 剩余五模块设计：管理员/选座/退改签/积分/看板 | v0.1 |
 | 设计 | [design/06-首页推荐与内容资源设计.md](design/06-首页推荐与内容资源设计.md) | 首页推荐、外部视频URL、颜色头像、附近影院 | v0.1 |
 | 设计 | [design/07-前端UIUX与架构.md](design/07-前端UIUX与架构.md) | 胶片灰/影院红用户端、深灰管理端、Router、Axios、Server Hook | 已确认基线 v0.3 |

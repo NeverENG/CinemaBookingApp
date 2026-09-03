@@ -58,9 +58,9 @@ func newChangeTestSvc(
 	box *fakeBoxOfficeRepo,
 ) *ChangeTicketSvc {
 	orderSvc := NewOrderSvc(fakeTxManager{}, users, sessions, seats, locks, coupons, orders)
-	paymentSvc := NewPaymentSvc(fakeTxManager{}, payments, &fakeCallbackRepo{}, orders, locks, coupons, points, box, &fakeMembershipRepo{})
+	paymentSvc := NewPaymentSvc(fakeTxManager{}, payments, &fakeCallbackRepo{}, orders, sessions, locks, coupons, points, box, &fakeMembershipRepo{})
 	refundSvc := NewRefundSvc(fakeTxManager{}, orders, refunds, payments, locks, points, sessions, box)
-	return NewChangeTicketSvc(orders, sessions, orderSvc, paymentSvc, refundSvc)
+	return NewChangeTicketSvc(fakeTxManager{}, orders, sessions, orderSvc, paymentSvc, refundSvc)
 }
 
 func TestChangeTicketHappy(t *testing.T) {
@@ -83,6 +83,25 @@ func TestChangeTicketHappy(t *testing.T) {
 	}
 	if len(refunds.refunds) != 1 {
 		t.Fatal("expected original refund created")
+	}
+}
+
+func TestChangeTicketDuplicateReturnsOriginalResult(t *testing.T) {
+	users, sessions, seats, orders, payments, locks, coupons, refunds, points, box := changeFixture()
+	svc := newChangeTestSvc(users, sessions, seats, orders, payments, locks, coupons, refunds, points, box)
+	first, err := svc.Change(context.Background(), 1, "O1", 11, []int64{1})
+	if err != nil {
+		t.Fatalf("first change: %v", err)
+	}
+	second, err := svc.Change(context.Background(), 1, "O1", 11, []int64{1})
+	if err != nil {
+		t.Fatalf("duplicate change: %v", err)
+	}
+	if first.NewOrderNo != second.NewOrderNo || first.RefundNo != second.RefundNo {
+		t.Fatalf("duplicate created another result: first=%+v second=%+v", first, second)
+	}
+	if len(refunds.refunds) != 1 {
+		t.Fatalf("expected one refund, got %d", len(refunds.refunds))
 	}
 }
 

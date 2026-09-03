@@ -73,8 +73,20 @@ func (r *OrderRepo) CreateOrder(ctx context.Context, order *domain.Order) error 
 }
 
 func (r *OrderRepo) GetOrderByNo(ctx context.Context, orderNo string) (*domain.Order, error) {
+	return r.getOrderByNo(ctx, orderNo, false)
+}
+
+func (r *OrderRepo) GetOrderForUpdate(ctx context.Context, orderNo string) (*domain.Order, error) {
+	return r.getOrderByNo(ctx, orderNo, true)
+}
+
+func (r *OrderRepo) getOrderByNo(ctx context.Context, orderNo string, forUpdate bool) (*domain.Order, error) {
 	var row orderRow
-	err := r.db.db(ctx).Where("order_no = ?", orderNo).First(&row).Error
+	query := r.db.db(ctx)
+	if forUpdate {
+		query = query.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	err := query.Where("order_no = ?", orderNo).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrOrderNotFound
 	}

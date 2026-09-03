@@ -64,6 +64,10 @@ func (f *fakeSessionRepo) GetSessionByID(ctx context.Context, id int64) (*domain
 	return nil, domain.ErrSessionNotFound
 }
 
+func (f *fakeSessionRepo) GetSessionForUpdate(ctx context.Context, id int64) (*domain.ShowSession, error) {
+	return f.GetSessionByID(ctx, id)
+}
+
 func (f *fakeSessionRepo) Create(ctx context.Context, session *domain.ShowSession) error {
 	if f.sessions == nil {
 		f.sessions = make(map[int64]*domain.ShowSession)
@@ -164,6 +168,7 @@ type fakeSeatLockRepo struct {
 	released       []int64
 	releasedOrders []string
 	active         []domain.SeatLock
+	expiredSeats   []int64
 }
 
 func (f *fakeSeatLockRepo) CreateLocks(ctx context.Context, locks []domain.SeatLock) error {
@@ -171,6 +176,11 @@ func (f *fakeSeatLockRepo) CreateLocks(ctx context.Context, locks []domain.SeatL
 		return f.lockErr
 	}
 	f.locked = append(f.locked, locks...)
+	return nil
+}
+
+func (f *fakeSeatLockRepo) ReleaseExpiredBySeats(ctx context.Context, sessionID int64, seatIDs []int64) error {
+	f.expiredSeats = append(f.expiredSeats, seatIDs...)
 	return nil
 }
 
@@ -317,6 +327,10 @@ func (f *fakeOrderRepo) GetOrderByNo(ctx context.Context, orderNo string) (*doma
 		return o, nil
 	}
 	return nil, domain.ErrOrderNotFound
+}
+
+func (f *fakeOrderRepo) GetOrderForUpdate(ctx context.Context, orderNo string) (*domain.Order, error) {
+	return f.GetOrderByNo(ctx, orderNo)
 }
 
 func (f *fakeOrderRepo) Transition(ctx context.Context, orderNo string, from, to domain.OrderStatus, version int32) error {
@@ -519,6 +533,17 @@ func TestCreateOrderSeatLockConflict(t *testing.T) {
 	})
 	if !errors.Is(err, domain.ErrSeatLockConflict) {
 		t.Fatalf("expected ErrSeatLockConflict, got %v", err)
+	}
+}
+
+func TestCreateOrderReleasesExpiredTargetLocks(t *testing.T) {
+	locks := &fakeSeatLockRepo{}
+	svc := newTestOrderSvc(&fakeUserRepo{users: map[int64]*domain.User{1: {ID: 1}}}, &fakeSessionRepo{sessions: map[int64]*domain.ShowSession{10: {ID: 10, HallID: 20, Status: domain.SessionOpen, StartTime: time.Now().Add(time.Hour), BasePriceCents: 5000}}}, &fakeSeatRepo{seats: map[int64]domain.Seat{3: {ID: 3, HallID: 20, Status: domain.SeatEnabled}}}, locks, &fakeCouponRepo{}, &fakeOrderRepo{})
+	if _, err := svc.CreateOrder(context.Background(), CreateOrderInput{UserID: 1, SessionID: 10, SeatIDs: []int64{3}}); err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	if len(locks.expiredSeats) != 1 || locks.expiredSeats[0] != 3 {
+		t.Fatalf("expected expired target lock cleanup, got %v", locks.expiredSeats)
 	}
 }
 

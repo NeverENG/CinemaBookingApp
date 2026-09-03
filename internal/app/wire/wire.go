@@ -91,7 +91,7 @@ func NewApp(cfg config.Config) (*App, error) {
 	}
 
 	orderSvc := service.NewOrderSvc(txm, userRepo, sessionRepo, seatRepo, seatLockRepo, couponRepo, orderRepo)
-	paymentSvc := service.NewPaymentSvc(txm, paymentRepo, callbackRepo, orderRepo, seatLockRepo, couponRepo, pointsRepo, boxOfficeRepo, membershipRepo)
+	paymentSvc := service.NewPaymentSvc(txm, paymentRepo, callbackRepo, orderRepo, sessionRepo, seatLockRepo, couponRepo, pointsRepo, boxOfficeRepo, membershipRepo)
 	authSvc := service.NewAuthSvc(
 		txm, userRepo, adminRepo, roleRepo, tokens, loginGuardRepo,
 		service.Bootstrap{
@@ -115,9 +115,9 @@ func NewApp(cfg config.Config) (*App, error) {
 		log.Printf("ensure demo user: %v", err)
 	}
 
-	movieSvc := service.NewAdminMovieSvc(movieRepo, operationLogRepo)
-	hallSvc := service.NewAdminHallSvc(hallRepo, seatRepo, operationLogRepo)
-	sessionSvc := service.NewAdminSessionSvc(sessionRepo, movieRepo, hallRepo, seatLockRepo, orderRepo, couponRepo, refundRepo, paymentRepo, pointsRepo, boxOfficeRepo, operationLogRepo)
+	movieSvc := service.NewAdminMovieSvc(txm, movieRepo, operationLogRepo)
+	hallSvc := service.NewAdminHallSvc(txm, hallRepo, seatRepo, operationLogRepo)
+	sessionSvc := service.NewAdminSessionSvc(txm, sessionRepo, movieRepo, hallRepo, seatLockRepo, orderRepo, couponRepo, refundRepo, paymentRepo, pointsRepo, boxOfficeRepo, operationLogRepo)
 	seatMapSvc := service.NewSeatMapSvc(sessionRepo, seatRepo, seatLockRepo, movieRepo, hallRepo, cinemaRepo)
 	catalogSvc := service.NewCatalogSvc(movieRepo, cinemaRepo, orderRepo)
 	orderQuerySvc := service.NewOrderQuerySvc(orderRepo, sessionRepo, movieRepo, hallRepo, cinemaRepo)
@@ -126,11 +126,11 @@ func NewApp(cfg config.Config) (*App, error) {
 	pointsSvc := service.NewPointsSvc(txm, pointsRepo, couponRepo)
 	refundSvc := service.NewRefundSvc(txm, orderRepo, refundRepo, paymentRepo, seatLockRepo, pointsRepo, sessionRepo, boxOfficeRepo)
 	boxOfficeSvc := service.NewBoxOfficeSvc(boxOfficeRepo)
-	changeSvc := service.NewChangeTicketSvc(orderRepo, sessionRepo, orderSvc, paymentSvc, refundSvc)
+	changeSvc := service.NewChangeTicketSvc(txm, orderRepo, sessionRepo, orderSvc, paymentSvc, refundSvc)
 	ticketVerificationSvc := service.NewTicketVerificationSvc(txm, orderRepo, orderRepo, operationLogRepo)
 	couponSvc := service.NewAdminCouponSvc(txm, couponRepo, userRepo, operationLogRepo)
 	adminUserSvc := service.NewAdminUserSvc(adminRepo, roleRepo, operationLogRepo)
-	adminCinemaSvc := service.NewAdminCinemaSvc(cinemaRepo, operationLogRepo)
+	adminCinemaSvc := service.NewAdminCinemaSvc(txm, cinemaRepo, operationLogRepo)
 
 	orderHandler := handler.NewOrderHandler(orderSvc, orderQuerySvc)
 	paymentHandler := handler.NewPaymentHandler(paymentSvc)
@@ -153,7 +153,7 @@ func NewApp(cfg config.Config) (*App, error) {
 	catalogHandler := handler.NewCatalogHandler(catalogSvc)
 	authMw := middleware.NewAuthMiddleware(tokens, userRepo, adminRepo, roleRepo)
 
-	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler, refundHandler, dashboardHandler, changeHandler, healthHandler, couponHandler, adminUserHandler, adminCinemaHandler, catalogHandler, ticketHandler)
+	engine := router.New(orderHandler, paymentHandler, authHandler, authMw, movieHandler, hallHandler, sessionHandler, userSessionHandler, homeHandler, bannerHandler, pointsHandler, refundHandler, dashboardHandler, changeHandler, healthHandler, couponHandler, adminUserHandler, adminCinemaHandler, catalogHandler, ticketHandler, cfg.CallbackSecret)
 
 	runner := job.NewRunner()
 	runner.Add("order_timeout", func(ctx context.Context) error {

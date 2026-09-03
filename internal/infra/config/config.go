@@ -9,14 +9,15 @@ import (
 )
 
 type Config struct {
-	DB          DB
-	HTTPAddr    string
-	GINMode     string
-	JWTSecret   string
-	JWTExpire   time.Duration
-	Admin       Admin
-	CinemaAdmin CinemaAdmin
-	Demo        Demo
+	DB             DB
+	HTTPAddr       string
+	GINMode        string
+	JWTSecret      string
+	JWTExpire      time.Duration
+	CallbackSecret string
+	Admin          Admin
+	CinemaAdmin    CinemaAdmin
+	Demo           Demo
 }
 
 // DB 数据库连接配置；DSNOverride 设置时优先使用完整 DSN。
@@ -60,10 +61,11 @@ func Load() Config {
 			SSLMode:     env("DB_SSLMODE", "disable"),
 			TimeZone:    env("DB_TIMEZONE", "Asia/Shanghai"),
 		},
-		HTTPAddr:  env("HTTP_ADDR", ":8080"),
-		GINMode:   envGINMode(),
-		JWTSecret: env("JWT_SECRET", "dev-secret"),
-		JWTExpire: time.Duration(envInt("JWT_EXPIRE_HOURS", 24)) * time.Hour,
+		HTTPAddr:       env("HTTP_ADDR", ":8080"),
+		GINMode:        envGINMode(),
+		JWTSecret:      env("JWT_SECRET", "dev-secret"),
+		JWTExpire:      time.Duration(envInt("JWT_EXPIRE_HOURS", 24)) * time.Hour,
+		CallbackSecret: env("CALLBACK_SECRET", ""),
 		Admin: Admin{
 			Username: strings.ToLower(strings.TrimSpace(env("ADMIN_USERNAME", "admin"))),
 			Password: env("ADMIN_PASSWORD", "admin123"),

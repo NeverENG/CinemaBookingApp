@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react'
 import { clearStoredAuth, getStoredAuth, setStoredAuth } from '../auth'
 import { AUTH_EXPIRED_EVENT } from '../services/http/client'
@@ -13,25 +13,31 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: PropsWithChildren) {
+  const queryClient = useQueryClient()
   const [session, setSession] = useState<AuthSession | null>(() => getStoredAuth())
 
   useEffect(() => {
-    const handleExpired = () => setSession(null)
+    const handleExpired = () => {
+      queryClient.clear()
+      setSession(null)
+    }
     window.addEventListener(AUTH_EXPIRED_EVENT, handleExpired)
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleExpired)
-  }, [])
+  }, [queryClient])
 
   const value = useMemo<AuthContextValue>(() => ({
     session,
     signIn: (next) => {
+      queryClient.clear()
       setStoredAuth(next)
       setSession(next)
     },
     signOut: () => {
+      queryClient.clear()
       clearStoredAuth()
       setSession(null)
     },
-  }), [session])
+  }), [queryClient, session])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

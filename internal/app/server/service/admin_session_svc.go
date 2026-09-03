@@ -15,6 +15,7 @@ const sessionChangeLockMinutes = 30
 
 // AdminSessionSvc 场次排期/改价/取消。
 type AdminSessionSvc struct {
+	tx       port.TxManager
 	sessions port.SessionRepo
 	movies   port.MovieRepo
 	halls    port.HallRepo
@@ -29,6 +30,7 @@ type AdminSessionSvc struct {
 }
 
 func NewAdminSessionSvc(
+	tx port.TxManager,
 	sessions port.SessionRepo,
 	movies port.MovieRepo,
 	halls port.HallRepo,
@@ -42,6 +44,7 @@ func NewAdminSessionSvc(
 	logs port.OperationLogRepo,
 ) *AdminSessionSvc {
 	return &AdminSessionSvc{
+		tx:       tx,
 		sessions: sessions,
 		movies:   movies,
 		halls:    halls,
@@ -67,6 +70,16 @@ type SessionInput struct {
 }
 
 func (s *AdminSessionSvc) Create(ctx context.Context, scope domain.AdminScope, in SessionInput) (*domain.ShowSession, error) {
+	var session *domain.ShowSession
+	err := s.tx.Run(ctx, func(txCtx context.Context) error {
+		var err error
+		session, err = s.create(txCtx, scope, in)
+		return err
+	})
+	return session, err
+}
+
+func (s *AdminSessionSvc) create(ctx context.Context, scope domain.AdminScope, in SessionInput) (*domain.ShowSession, error) {
 	if !scope.CanManageCinema(in.CinemaID) {
 		return nil, domain.ErrForbidden
 	}
@@ -115,7 +128,13 @@ func (s *AdminSessionSvc) Create(ctx context.Context, scope domain.AdminScope, i
 
 // UpdatePrice 开场前 30 分钟锁定改价。
 func (s *AdminSessionSvc) UpdatePrice(ctx context.Context, scope domain.AdminScope, sessionID int64, basePriceCents int64, priceRulesJSON string) error {
-	session, err := s.sessions.GetSessionByID(ctx, sessionID)
+	return s.tx.Run(ctx, func(txCtx context.Context) error {
+		return s.updatePrice(txCtx, scope, sessionID, basePriceCents, priceRulesJSON)
+	})
+}
+
+func (s *AdminSessionSvc) updatePrice(ctx context.Context, scope domain.AdminScope, sessionID int64, basePriceCents int64, priceRulesJSON string) error {
+	session, err := s.sessions.GetSessionForUpdate(ctx, sessionID)
 	if err != nil {
 		return err
 	}
@@ -143,7 +162,13 @@ func (s *AdminSessionSvc) UpdatePrice(ctx context.Context, scope domain.AdminSco
 
 // Cancel 取消场次：释放锁、过期待支付订单、解锁优惠券。
 func (s *AdminSessionSvc) Cancel(ctx context.Context, scope domain.AdminScope, sessionID int64) error {
-	session, err := s.sessions.GetSessionByID(ctx, sessionID)
+	return s.tx.Run(ctx, func(txCtx context.Context) error {
+		return s.cancelInTx(txCtx, scope, sessionID)
+	})
+}
+
+func (s *AdminSessionSvc) cancelInTx(ctx context.Context, scope domain.AdminScope, sessionID int64) error {
+	session, err := s.sessions.GetSessionForUpdate(ctx, sessionID)
 	if err != nil {
 		return err
 	}
@@ -183,6 +208,14 @@ func (s *AdminSessionSvc) Cancel(ctx context.Context, scope domain.AdminScope, s
 }
 
 func (s *AdminSessionSvc) refundOrder(ctx context.Context, order domain.Order) error {
+	if existing, err := s.refunds.GetByOrderNo(ctx, order.OrderNo); err == nil {
+		if existing.Status == domain.RefundSuccess {
+			return nil
+		}
+		return domain.ErrInvalidTransition
+	} else if !errors.Is(err, domain.ErrRefundNotFound) {
+		return err
+	}
 	refund := &domain.Refund{
 		RefundNo:         uid.RefundNo(),
 		OrderNo:          order.OrderNo,

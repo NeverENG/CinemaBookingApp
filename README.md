@@ -9,7 +9,7 @@ Go（Gin + GORM + PostgreSQL）后端，React + TypeScript 前端。项目包含
 ```bash
 cp .env.example .env
 
-# 部署前至少修改 POSTGRES_PASSWORD、JWT_SECRET 和演示账号密码
+# 部署前至少修改 POSTGRES_PASSWORD、JWT_SECRET、CALLBACK_SECRET 和演示账号密码
 docker compose up -d --build
 docker compose ps
 ```

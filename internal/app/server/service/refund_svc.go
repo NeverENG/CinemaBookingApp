@@ -54,7 +54,9 @@ type ApplyRefundInput struct {
 func (s *RefundSvc) ApplyRefund(ctx context.Context, userID int64, in ApplyRefundInput) (*domain.Refund, error) {
 	var refund *domain.Refund
 	err := s.tx.Run(ctx, func(txCtx context.Context) error {
-		order, err := s.orders.GetOrderByNo(txCtx, in.OrderNo)
+		// Serialize concurrent refund requests for the same order. This keeps
+		// the status check and refund creation atomic at the business level.
+		order, err := s.orders.GetOrderForUpdate(txCtx, in.OrderNo)
 		if err != nil {
 			return err
 		}
@@ -157,4 +159,15 @@ func (s *RefundSvc) HandleMockCallback(ctx context.Context, refundNo string) err
 		}
 		return s.refunds.MarkSuccess(txCtx, refund.RefundNo)
 	})
+}
+
+func (s *RefundSvc) HandleMockCallbackForUser(ctx context.Context, userID int64, refundNo string) error {
+	refund, err := s.refunds.GetByRefundNo(ctx, refundNo)
+	if err != nil {
+		return err
+	}
+	if refund.UserID != userID {
+		return domain.ErrForbidden
+	}
+	return s.HandleMockCallback(ctx, refundNo)
 }

@@ -11,12 +11,13 @@ import (
 
 // AdminMovieSvc 影片管理用例（含操作审计）。
 type AdminMovieSvc struct {
+	tx     port.TxManager
 	movies port.MovieRepo
 	logs   port.OperationLogRepo
 }
 
-func NewAdminMovieSvc(movies port.MovieRepo, logs port.OperationLogRepo) *AdminMovieSvc {
-	return &AdminMovieSvc{movies: movies, logs: logs}
+func NewAdminMovieSvc(tx port.TxManager, movies port.MovieRepo, logs port.OperationLogRepo) *AdminMovieSvc {
+	return &AdminMovieSvc{tx: tx, movies: movies, logs: logs}
 }
 
 type MovieInput struct {
@@ -31,6 +32,16 @@ type MovieInput struct {
 }
 
 func (s *AdminMovieSvc) Create(ctx context.Context, scope domain.AdminScope, in MovieInput) (*domain.Movie, error) {
+	var movie *domain.Movie
+	err := s.tx.Run(ctx, func(txCtx context.Context) error {
+		var err error
+		movie, err = s.create(txCtx, scope, in)
+		return err
+	})
+	return movie, err
+}
+
+func (s *AdminMovieSvc) create(ctx context.Context, scope domain.AdminScope, in MovieInput) (*domain.Movie, error) {
 	if scope.Role != domain.RoleSuperAdmin {
 		return nil, domain.ErrForbidden
 	}
@@ -56,6 +67,16 @@ func (s *AdminMovieSvc) Create(ctx context.Context, scope domain.AdminScope, in 
 }
 
 func (s *AdminMovieSvc) Update(ctx context.Context, scope domain.AdminScope, movieID int64, in MovieInput) (*domain.Movie, error) {
+	var movie *domain.Movie
+	err := s.tx.Run(ctx, func(txCtx context.Context) error {
+		var err error
+		movie, err = s.update(txCtx, scope, movieID, in)
+		return err
+	})
+	return movie, err
+}
+
+func (s *AdminMovieSvc) update(ctx context.Context, scope domain.AdminScope, movieID int64, in MovieInput) (*domain.Movie, error) {
 	if scope.Role != domain.RoleSuperAdmin {
 		return nil, domain.ErrForbidden
 	}
@@ -81,6 +102,12 @@ func (s *AdminMovieSvc) Update(ctx context.Context, scope domain.AdminScope, mov
 }
 
 func (s *AdminMovieSvc) SetStatus(ctx context.Context, scope domain.AdminScope, movieID int64, status domain.MovieStatus) error {
+	return s.tx.Run(ctx, func(txCtx context.Context) error {
+		return s.setStatus(txCtx, scope, movieID, status)
+	})
+}
+
+func (s *AdminMovieSvc) setStatus(ctx context.Context, scope domain.AdminScope, movieID int64, status domain.MovieStatus) error {
 	if scope.Role != domain.RoleSuperAdmin {
 		return domain.ErrForbidden
 	}

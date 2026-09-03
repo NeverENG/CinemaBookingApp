@@ -140,7 +140,7 @@ var superAdminScope = domain.AdminScope{AdminID: 1, Role: domain.RoleSuperAdmin}
 func TestAdminMovieCreate(t *testing.T) {
 	movies := &fakeMovieRepo{}
 	logs := &fakeOperationLogRepo{}
-	svc := NewAdminMovieSvc(movies, logs)
+	svc := NewAdminMovieSvc(fakeTxManager{}, movies, logs)
 
 	movie, err := svc.Create(context.Background(), superAdminScope, MovieInput{
 		Title:           "沙丘3",
@@ -161,7 +161,7 @@ func TestAdminMovieCreate(t *testing.T) {
 func TestAdminMovieCreateInvalid(t *testing.T) {
 	movies := &fakeMovieRepo{}
 	logs := &fakeOperationLogRepo{}
-	svc := NewAdminMovieSvc(movies, logs)
+	svc := NewAdminMovieSvc(fakeTxManager{}, movies, logs)
 
 	_, err := svc.Create(context.Background(), superAdminScope, MovieInput{})
 	if !errors.Is(err, domain.ErrMovieInvalid) {
@@ -176,7 +176,7 @@ func TestAdminMovieCinemaAdminIsReadOnly(t *testing.T) {
 	movies := &fakeMovieRepo{movies: map[int64]*domain.Movie{
 		1: {ID: 1, Title: "沙丘3", Status: domain.MovieOnSale},
 	}}
-	svc := NewAdminMovieSvc(movies, &fakeOperationLogRepo{})
+	svc := NewAdminMovieSvc(fakeTxManager{}, movies, &fakeOperationLogRepo{})
 	scope := domain.AdminScope{AdminID: 2, Role: domain.RoleCinemaAdmin, CinemaID: int64Ptr(100)}
 
 	if listed, err := svc.List(context.Background(), scope); err != nil || len(listed) != 1 {
@@ -194,7 +194,7 @@ func TestAdminHallCreateSyncsSeats(t *testing.T) {
 	halls := &fakeHallRepo{}
 	seats := &fakeSeatRepo{}
 	logs := &fakeOperationLogRepo{}
-	svc := NewAdminHallSvc(halls, seats, logs)
+	svc := NewAdminHallSvc(fakeTxManager{}, halls, seats, logs)
 
 	hall, err := svc.Create(context.Background(), superAdminScope, HallInput{
 		CinemaID:   10,
@@ -247,7 +247,7 @@ func TestAdminSessionCreate(t *testing.T) {
 	halls := &fakeHallRepo{halls: map[int64]*domain.Hall{
 		10: {ID: 10, CinemaID: 100, Name: "1号厅"},
 	}}
-	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeOperationLogRepo{})
+	svc := NewAdminSessionSvc(fakeTxManager{}, sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeOperationLogRepo{})
 
 	session, err := svc.Create(context.Background(), superAdminScope, SessionInput{
 		CinemaID:       100,
@@ -274,7 +274,7 @@ func TestAdminSessionPriceRules(t *testing.T) {
 	halls := &fakeHallRepo{halls: map[int64]*domain.Hall{
 		10: {ID: 10, CinemaID: 100, Name: "IMAX厅"},
 	}}
-	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeOperationLogRepo{})
+	svc := NewAdminSessionSvc(fakeTxManager{}, sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeOperationLogRepo{})
 
 	session, err := svc.Create(context.Background(), superAdminScope, SessionInput{
 		CinemaID:       100,
@@ -306,7 +306,7 @@ func TestAdminSessionRejectsInvalidPriceRules(t *testing.T) {
 	sessions := &fakeSessionRepo{}
 	movies := &fakeMovieRepo{movies: map[int64]*domain.Movie{1: {ID: 1, Title: "沙丘3", DurationMinutes: 90, Status: domain.MovieOnSale}}}
 	halls := &fakeHallRepo{halls: map[int64]*domain.Hall{10: {ID: 10, CinemaID: 100, Name: "1号厅"}}}
-	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeOperationLogRepo{})
+	svc := NewAdminSessionSvc(fakeTxManager{}, sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeOperationLogRepo{})
 
 	_, err := svc.Create(context.Background(), superAdminScope, SessionInput{
 		CinemaID:       100,
@@ -333,7 +333,7 @@ func TestAdminSessionCreateOverlap(t *testing.T) {
 	halls := &fakeHallRepo{halls: map[int64]*domain.Hall{
 		10: {ID: 10, CinemaID: 100, Name: "1号厅"},
 	}}
-	svc := NewAdminSessionSvc(sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeOperationLogRepo{})
+	svc := NewAdminSessionSvc(fakeTxManager{}, sessions, movies, halls, &fakeSeatLockRepo{}, &fakeOrderRepo{}, &fakeCouponRepo{}, &fakeRefundRepo{}, &fakePaymentRepo{}, &fakePointsRepo{}, &fakeBoxOfficeRepo{}, &fakeOperationLogRepo{})
 
 	_, err := svc.Create(context.Background(), superAdminScope, SessionInput{
 		CinemaID:       100,
@@ -368,7 +368,7 @@ func TestAdminSessionCancel(t *testing.T) {
 	points := &fakePointsRepo{}
 	box := &fakeBoxOfficeRepo{}
 	logs := &fakeOperationLogRepo{}
-	svc := NewAdminSessionSvc(sessions, movies, halls, locks, orders, coupons, refunds, payments, points, box, logs)
+	svc := NewAdminSessionSvc(fakeTxManager{}, sessions, movies, halls, locks, orders, coupons, refunds, payments, points, box, logs)
 
 	if err := svc.Cancel(context.Background(), superAdminScope, 5); err != nil {
 		t.Fatalf("cancel session: %v", err)
@@ -406,7 +406,7 @@ func TestAdminHallForbiddenForCinemaAdmin(t *testing.T) {
 	halls := &fakeHallRepo{}
 	seats := &fakeSeatRepo{}
 	logs := &fakeOperationLogRepo{}
-	svc := NewAdminHallSvc(halls, seats, logs)
+	svc := NewAdminHallSvc(fakeTxManager{}, halls, seats, logs)
 	scope := domain.AdminScope{AdminID: 2, Role: domain.RoleCinemaAdmin, CinemaID: int64Ptr(999)}
 
 	_, err := svc.Create(context.Background(), scope, HallInput{

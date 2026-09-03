@@ -64,6 +64,15 @@ func (r *SeatLockRepo) CreateLocks(ctx context.Context, locks []domain.SeatLock)
 	return nil
 }
 
+func (r *SeatLockRepo) ReleaseExpiredBySeats(ctx context.Context, sessionID int64, seatIDs []int64) error {
+	if len(seatIDs) == 0 {
+		return nil
+	}
+	return r.db.db(ctx).Model(&seatLockRow{}).
+		Where("session_id = ? AND seat_id IN ? AND status = ? AND expires_at <= ?", sessionID, seatIDs, domain.SeatLockLocked, time.Now()).
+		Updates(map[string]any{"status": domain.SeatLockExpired, "released_at": time.Now()}).Error
+}
+
 func (r *SeatLockRepo) MarkBookedByOrderNo(ctx context.Context, orderNo string) error {
 	return r.db.db(ctx).
 		Model(&seatLockRow{}).

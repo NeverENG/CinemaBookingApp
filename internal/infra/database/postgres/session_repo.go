@@ -10,6 +10,7 @@ import (
 	"github.com/NeverENG/CinemaBookingApp/internal/core/domain"
 	"github.com/NeverENG/CinemaBookingApp/internal/core/port"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type showSessionRow struct {
@@ -38,8 +39,20 @@ func NewSessionRepo(db *DB) *SessionRepo {
 }
 
 func (r *SessionRepo) GetSessionByID(ctx context.Context, id int64) (*domain.ShowSession, error) {
+	return r.getSession(ctx, id, false)
+}
+
+func (r *SessionRepo) GetSessionForUpdate(ctx context.Context, id int64) (*domain.ShowSession, error) {
+	return r.getSession(ctx, id, true)
+}
+
+func (r *SessionRepo) getSession(ctx context.Context, id int64, forUpdate bool) (*domain.ShowSession, error) {
 	var row showSessionRow
-	err := r.db.db(ctx).Where("id = ?", id).First(&row).Error
+	query := r.db.db(ctx)
+	if forUpdate {
+		query = query.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	err := query.Where("id = ?", id).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, domain.ErrSessionNotFound
 	}
@@ -144,7 +157,7 @@ func (r *SessionRepo) ListByFilter(ctx context.Context, movieID, cinemaID int64)
 	}
 	var rows []showSessionRow
 	if err := q.
-		Where("status IN ?", []domain.SessionStatus{domain.SessionOpen, domain.SessionSoldOut}).
+		Where("status = ? AND start_time > ?", domain.SessionOpen, time.Now()).
 		Order("start_time").
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -172,7 +185,7 @@ func (r *SessionRepo) RecalcStatus(ctx context.Context, sessionID int64) error {
 		SET status = CASE
 			WHEN (
 				SELECT count(*) FROM seat_locks l
-				WHERE l.session_id = s.id AND l.status IN ('LOCKED','BOOKED')
+				WHERE l.session_id = s.id AND (l.status = 'BOOKED' OR (l.status = 'LOCKED' AND l.expires_at > now()))
 			) >= (
 				SELECT count(*) FROM seats
 				WHERE hall_id = s.hall_id AND status = 'ENABLED'
